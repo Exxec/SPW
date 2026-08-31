@@ -4,7 +4,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from .jfr_events import parse_iso_duration_seconds, read_events_with_status, top_frame
+from .jfr_events import event_read_status, parse_iso_duration_seconds, read_events_with_status, top_frame
 
 _TOP_N = 25
 _GC_PAUSE_EVENT_TYPES = ["jdk.GCPhasePause", "jdk.GCPhasePauseLevel1", "jdk.GCPhasePauseLevel2", "jdk.GCPhasePauseLevel3", "jdk.GCPhasePauseLevel4"]
@@ -16,21 +16,18 @@ def analyze_allocation_and_gc(jfr_tool: Path, recording_path: Path) -> dict[str,
     Allocation-sample events require `STANDARD` or `DEEP_DIAGNOSTIC`;
     `PASSIVE` recordings only carry GC pause/heap events, so a `PASSIVE`
     report correctly shows no allocation data rather than an error. Check
-    `read_limitations` before treating a zero count as genuine, though --
-    it means the underlying `jfr print` read failed, not that nothing
-    happened.
+    `event_reads` before treating a zero count as genuine, though -- a
+    `"READ_FAILED"` status there means the underlying `jfr print` read
+    failed, not that nothing happened.
     """
 
-    read_limitations: dict[str, str] = {}
+    event_reads: dict[str, dict[str, Any]] = {}
     allocation_samples, limitation = read_events_with_status(jfr_tool, recording_path, ["jdk.ObjectAllocationSample"])
-    if limitation:
-        read_limitations["jdk.ObjectAllocationSample"] = limitation
+    event_reads["jdk.ObjectAllocationSample"] = event_read_status(allocation_samples, limitation)
     gc_pauses, limitation = read_events_with_status(jfr_tool, recording_path, _GC_PAUSE_EVENT_TYPES)
-    if limitation:
-        read_limitations["gc_pause_events"] = limitation
+    event_reads["gc_pause_events"] = event_read_status(gc_pauses, limitation)
     heap_summaries, limitation = read_events_with_status(jfr_tool, recording_path, ["jdk.GCHeapSummary"])
-    if limitation:
-        read_limitations["jdk.GCHeapSummary"] = limitation
+    event_reads["jdk.GCHeapSummary"] = event_read_status(heap_summaries, limitation)
 
     allocation_by_class: Counter[str] = Counter()
     allocation_by_frame: Counter[tuple[str, str]] = Counter()
@@ -82,5 +79,5 @@ def analyze_allocation_and_gc(jfr_tool: Path, recording_path: Path) -> dict[str,
             "high_water_mark_bytes": high_water_mark,
             "reclaimed_bytes_by_gc_id": reclaimed_by_gc,
         },
-        "read_limitations": read_limitations,
+        "event_reads": event_reads,
     }

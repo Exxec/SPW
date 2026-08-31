@@ -4,7 +4,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from .jfr_events import parse_jfr_timestamp, read_events_with_status, top_frame
+from .jfr_events import event_read_status, parse_jfr_timestamp, read_events_with_status, top_frame
 
 TICK_EVENT_TYPE = "com.spw.TickBoundary"
 _STALL_TOP_FRAMES = 5
@@ -19,9 +19,9 @@ def analyze_ticks(jfr_tool: Path, recording_path: Path) -> dict[str, Any]:
     section). Its absence is not an error: `ticks_available` is `False`
     and every other field is left empty, exactly like a `PASSIVE`
     recording correctly showing no execution samples -- unless
-    `read_limitation` is set, in which case the absence reflects a failed
-    read (e.g. a `jfr print` timeout on a very large recording), not a
-    confirmed "mod not installed".
+    `event_reads[TICK_EVENT_TYPE]["status"]` is `"READ_FAILED"`, in which
+    case the absence reflects a failed read (e.g. a `jfr print` timeout on
+    a very large recording), not a confirmed "mod not installed".
     """
 
     events, read_limitation = read_events_with_status(jfr_tool, recording_path, [TICK_EVENT_TYPE])
@@ -29,7 +29,7 @@ def analyze_ticks(jfr_tool: Path, recording_path: Path) -> dict[str, Any]:
         return {
             "ticks_available": False,
             "tick_count": 0,
-            "read_limitation": read_limitation,
+            "event_reads": {TICK_EVENT_TYPE: event_read_status(events, read_limitation)},
             "limitations": (
                 "No com.spw.TickBoundary events were found. This requires the optional SPW Tick Marker mod "
                 "(spw/agent-mod) to be installed and enabled in the profiled installation, and the capture to "
@@ -60,7 +60,7 @@ def analyze_ticks(jfr_tool: Path, recording_path: Path) -> dict[str, Any]:
 
     return {
         "ticks_available": True,
-        "read_limitation": None,
+        "event_reads": {TICK_EVENT_TYPE: event_read_status(events, None)},
         "tick_count": len(events),
         "average_tick_seconds": average_tick_seconds,
         "max_tick_seconds": max_tick_seconds,

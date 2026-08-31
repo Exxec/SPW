@@ -49,6 +49,41 @@ class ReportViewerTests(unittest.TestCase):
             html = render_html_report(root)
         self.assertIn("Not available", html)
 
+    def test_sections_are_collapsible_details_elements(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "environment.json").write_text(json.dumps({"installation_path": str(root), "java": {}, "mod_count": 1, "findings": []}), encoding="utf-8")
+            html = render_html_report(root)
+        self.assertIn("<details open><summary>Environment</summary>", html)
+        self.assertIn("<details open><summary>Findings (0)</summary>", html)
+        self.assertNotIn("<section>", html)
+
+    def test_top_frame_and_allocation_tables_are_sortable_with_numeric_data_value(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "environment.json").write_text(json.dumps({"installation_path": str(root), "java": {}, "mod_count": 0, "findings": []}), encoding="utf-8")
+            (root / "cpu-thread-analysis.json").write_text(
+                json.dumps({"total_execution_samples": 1, "execution_samples_available": True, "samples_by_top_frame": [{"class_name": "com.example.Mod", "method_name": "tick", "samples": 1024}]}),
+                encoding="utf-8",
+            )
+            (root / "allocation-gc-analysis.json").write_text(
+                json.dumps({"gc_summary": {"pause_event_count": 0}, "heap_summary": {"high_water_mark_bytes": 0}, "allocation_by_class_bytes": {"[B": 2048}}),
+                encoding="utf-8",
+            )
+            html = render_html_report(root)
+        self.assertIn("<table class='sortable'>", html)
+        self.assertIn("data-value='1024'", html)
+        self.assertIn("1,024", html)
+        self.assertIn("data-value='2048'", html)
+
+    def test_sort_script_is_embedded_once(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "environment.json").write_text(json.dumps({"installation_path": str(root), "java": {}, "mod_count": 0, "findings": []}), encoding="utf-8")
+            html = render_html_report(root)
+        self.assertEqual(html.count("<script>"), 1)
+        self.assertIn("table.sortable", html)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,7 +7,7 @@ from typing import Any
 from .allocation_gc_analysis import analyze_allocation_and_gc
 from .attribution import attribute_execution_samples
 from .cpu_thread_analysis import analyze_cpu_and_threads
-from .jfr_events import read_events_with_status
+from .jfr_events import event_read_status, read_events_with_status
 from .rendering_diagnostics import analyze_rendering
 from .startup_analysis import analyze_startup
 from .tick_analysis import analyze_ticks, correlate_stalls_with_execution_samples
@@ -42,6 +42,7 @@ def run_analysis(jfr_tool: Path, recording_path: Path, mod_ownership: dict[str, 
         class_index = mod_ownership.get("class_index", {})
         package_prefix_index = mod_ownership.get("package_prefix_index", {})
         attribution = attribute_execution_samples(execution_samples, class_index, package_prefix_index)
+        attribution["execution_samples_event_read"] = event_read_status(execution_samples, execution_samples_limitation)
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -54,6 +55,18 @@ def run_analysis(jfr_tool: Path, recording_path: Path, mod_ownership: dict[str, 
         "tick_stall_correlation": tick_stall_correlation,
         "attribution": attribution,
     }
+
+
+def _read_failure_warnings(event_reads: dict[str, Any]) -> list[str]:
+    """Render one warning line per event type whose read failed (`event_read_status` "READ_FAILED").
+
+    Any count computed from a failed read is not a confirmed zero -- it is
+    unknown -- so these are surfaced unconditionally rather than silently
+    folded into a count of 0, which a reader could otherwise mistake for a
+    genuine "nothing happened" result.
+    """
+
+    return [f"  - `{event_type}`: {info['reason']}" for event_type, info in event_reads.items() if info.get("status") == "READ_FAILED"]
 
 
 def render_analysis_markdown(analysis: dict[str, Any]) -> str:
@@ -74,12 +87,20 @@ def render_analysis_markdown(analysis: dict[str, Any]) -> str:
     ]
     if cpu_thread["thread_lifecycle"]["still_running_at_capture_end"]:
         lines.append(f"- Still running at capture end: {', '.join(cpu_thread['thread_lifecycle']['still_running_at_capture_end'][:10])}")
+    cpu_read_failures = _read_failure_warnings(cpu_thread.get("event_reads", {}))
+    if cpu_read_failures:
+        lines.append("- WARNING: the following event reads failed; counts above involving them are unknown, not confirmed zero:")
+        lines.extend(cpu_read_failures)
     if cpu_thread["samples_by_top_frame"]:
         lines.append("- Top sampled frames:")
         for entry in cpu_thread["samples_by_top_frame"][:10]:
             lines.append(f"  - {entry['class_name']}.{entry['method_name']}: {entry['samples']} samples")
     lines.extend(["", "## Allocation and GC", ""])
     lines.append(f"- Allocation samples available: {allocation_gc['allocation_samples_available']}")
+    allocation_read_failures = _read_failure_warnings(allocation_gc.get("event_reads", {}))
+    if allocation_read_failures:
+        lines.append("- WARNING: the following event reads failed; counts above involving them are unknown, not confirmed zero:")
+        lines.extend(allocation_read_failures)
     if allocation_gc["allocation_by_class_bytes"]:
         lines.append("- Top allocating classes (sampled bytes):")
         for class_name, total in list(allocation_gc["allocation_by_class_bytes"].items())[:10]:
@@ -90,6 +111,10 @@ def render_analysis_markdown(analysis: dict[str, Any]) -> str:
     lines.extend(["", "## Startup (approximate)", ""])
     lines.append(f"- Time to first execution sample: {startup['time_to_first_execution_sample_seconds']} s")
     lines.append(f"- Limitation: {startup['limitations']}")
+    startup_read_failures = _read_failure_warnings(startup.get("event_reads", {}))
+    if startup_read_failures:
+        lines.append("- WARNING: the following event reads failed; the figures above may be incomplete, not confirmed:")
+        lines.extend(startup_read_failures)
     ticks = analysis.get("ticks") or {}
     lines.extend(["", "## Campaign ticks (SPW Tick Marker mod, optional)", ""])
     if ticks.get("ticks_available"):
@@ -123,6 +148,8 @@ def render_analysis_markdown(analysis: dict[str, Any]) -> str:
         lines.append(f"- Samples attributed: {attribution['total_samples_attributed']}")
         for owner, count in list(attribution["samples_by_owner"].items())[:10]:
             lines.append(f"  - {owner}: {count} samples")
+        if attribution["execution_samples_event_read"]["status"] == "READ_FAILED":
+            lines.append(f"- WARNING: reading `jdk.ExecutionSample` events failed ({attribution['execution_samples_event_read']['reason']}); the count above is unknown, not confirmed zero.")
     lines.extend(
         [
             "",

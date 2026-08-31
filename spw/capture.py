@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import re
 import subprocess
 import time
 from pathlib import Path
 
 from .capture_levels import jfc_path
+from .java_detector import detect_java
 from .models import FingerprintResult
+from .target_jvm import detect_target_jvm
 
 RECORDING_NAME = "spw"
 DEFAULT_LEVEL = "STANDARD"
@@ -20,6 +23,20 @@ def _jcmd_path(java_executable: Path | None, explicit_jcmd: Path | None) -> Path
         if candidate.exists():
             return candidate
     return None
+
+
+def _java_path_from_jcmd(jcmd_path: Path) -> Path:
+    return jcmd_path.with_name(f"java{jcmd_path.suffix}")
+
+
+_JAVA_MAJOR = re.compile(r"^(\d+)")
+
+
+def _java_major_version(version: str | None) -> int | None:
+    if not version:
+        return None
+    match = _JAVA_MAJOR.match(version)
+    return int(match.group(1)) if match else None
 
 
 def build_attach_start_command(jcmd_path: Path, pid: int, output_file: Path, duration_seconds: int, level: str = DEFAULT_LEVEL) -> list[str]:
@@ -65,7 +82,17 @@ def run_attach_capture(
     jcmd_path: Path | None = None,
     java_executable: Path | None = None,
 ) -> dict[str, object]:
-    """Start a JFR recording against an already-running JVM via `jcmd` attach, and wait for it to finish."""
+    """Start a JFR recording against an already-running JVM via `jcmd` attach, and wait for it to finish.
+
+    `--java`/`--jcmd` name the *tooling* JDK used to talk to the target
+    process, not necessarily the JVM the target is actually running under
+    (a real gap for e.g. a Mikohime-managed Java 27/28 setup attached to
+    from a different JDK on the operator's PATH). The descriptor therefore
+    records both `tooling_jdk` (from the executable used to invoke jcmd)
+    and `target_jvm` (from `jcmd <pid> VM.version`, answered by the target
+    process itself) as distinct fields, so a report never silently assumes
+    they are the same JVM.
+    """
 
     resolved_jcmd = _jcmd_path(java_executable, jcmd_path)
     descriptor: dict[str, object] = {
@@ -75,6 +102,8 @@ def run_attach_capture(
         "settings": {"duration_seconds": duration_seconds, "output_file": str(output_file)},
         "output_path": None,
         "incomplete_reason": None,
+        "tooling_jdk": None,
+        "target_jvm": None,
     }
     if resolved_jcmd is None:
         descriptor["incomplete_reason"] = "jcmd was not found; supply --jcmd explicitly or an accompanying java executable."
@@ -87,9 +116,34 @@ def run_attach_capture(
         )
         return descriptor
 
+    tooling_java_path = java_executable if java_executable is not None else _java_path_from_jcmd(resolved_jcmd)
+    descriptor["tooling_jdk"] = detect_java(tooling_java_path, allow_execute=True)
+    descriptor["target_jvm"] = detect_target_jvm(resolved_jcmd, pid)
+    tooling_major = _java_major_version(descriptor["tooling_jdk"].get("java_version"))
+    target_major = _java_major_version(descriptor["target_jvm"].get("jdk_version"))
+    if tooling_major is not None and target_major is not None and tooling_major != target_major:
+        result.add(
+            id="tooling-jdk-target-jvm-version-mismatch",
+            category="capture",
+            severity="info",
+            confidence="DETERMINISTIC",
+            explanation=(
+                f"The tooling JDK used to attach (major version {tooling_major}) differs from the target "
+                f"JVM actually running the profiled process (major version {target_major}). This is expected "
+                "for setups like Mikohime that run Starsector under a different Java version than the "
+                "operator's own tooling -- it is reported for awareness, not as a problem."
+            ),
+            evidence=[
+                f"tooling_jdk: {descriptor['tooling_jdk'].get('implementor', 'UNKNOWN')} {descriptor['tooling_jdk'].get('java_version', 'UNKNOWN')}",
+                f"target_jvm: {descriptor['target_jvm'].get('vm_name', 'UNKNOWN')} {descriptor['target_jvm'].get('vm_version', 'UNKNOWN')}",
+            ],
+        )
+
     start_command = build_attach_start_command(resolved_jcmd, pid, output_file, duration_seconds, level=level)
+    start_output = ""
     try:
-        subprocess.run(start_command, capture_output=True, text=True, timeout=15, check=True)
+        start_completed = subprocess.run(start_command, capture_output=True, text=True, timeout=15, check=True)
+        start_output = (start_completed.stdout or "").strip()
     except (OSError, subprocess.TimeoutExpired, subprocess.CalledProcessError) as exc:
         descriptor["incomplete_reason"] = f"JFR.start failed: {exc}"
         result.add(
@@ -108,7 +162,17 @@ def run_attach_capture(
     # still-being-written recording.
     time.sleep(duration_seconds)
     if not _wait_for_stable_file(output_file, max_wait_seconds=30):
+        # jcmd forwards a rejected diagnostic command to the target JVM's
+        # own handler, which can print an explanation and still exit 0 --
+        # confirmed directly against a real JRE 8 process with JFR not
+        # commercially unlocked ("Java Flight Recorder not enabled. Use
+        # VM.unlock_commercial_features to enable."), so `check=True`
+        # above never raises for it. That text, when present, is a far
+        # more actionable reason than the generic file-not-ready message
+        # alone, so it is appended rather than discarded.
         descriptor["incomplete_reason"] = "The recording file did not appear (or was still being written) within the expected time after the capture duration elapsed."
+        if start_output:
+            descriptor["incomplete_reason"] += f" jcmd JFR.start output: {start_output}"
         result.add(
             id="capture-file-not-ready",
             category="capture",

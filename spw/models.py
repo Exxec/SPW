@@ -25,6 +25,7 @@ class FingerprintResult:
     installation_path: Path
     java_executable: Path | None = None
     java: dict[str, Any] = field(default_factory=dict)
+    target_jvm: dict[str, Any] = field(default_factory=dict)
     gpus: dict[str, Any] = field(default_factory=dict)
     configured_jvm_arguments: list[str] = field(default_factory=list)
     enabled_mod_order: list[str] | None = None
@@ -49,6 +50,15 @@ class FingerprintResult:
             "schema_version": SCHEMA_VERSION,
             "installation_path": str(self.installation_path),
             "java": self.java,
+            # `java` is the *tooling* JDK (the executable passed as
+            # `--java`, fingerprinted via its own `release` file/`-version`
+            # output). `target_jvm` -- only populated after an attach-mode
+            # capture, via `jcmd <pid> VM.version` -- is the JVM actually
+            # running the profiled process, which can differ from the
+            # tooling JDK (e.g. a Mikohime-managed Java 27/28 setup
+            # attached to from a different JDK on the operator's PATH).
+            # Comparability and reporting must not conflate the two.
+            "target_jvm": self.target_jvm,
             "gpus": self.gpus,
             "configured_jvm_arguments": self.configured_jvm_arguments,
             "enabled_mod_order": self.enabled_mod_order,
@@ -72,6 +82,17 @@ class FingerprintResult:
             "class_index": self.class_index,
             "findings": self._findings_dicts(("mod-inventory", "jar-ownership")),
         }
+
+    def findings_dict(self) -> dict[str, Any]:
+        """All findings, unfiltered by category.
+
+        For contexts with no inventory stage to fold findings into (e.g.
+        the standalone `capture` subcommand has no `environment.json` of
+        its own) -- otherwise findings raised there would have nowhere to
+        land and be silently discarded.
+        """
+
+        return {"schema_version": SCHEMA_VERSION, "findings": self._findings_dicts()}
 
     def core_integrity_dict(self) -> dict[str, Any]:
         return {

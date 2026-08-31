@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from spw.tick_analysis import analyze_ticks, correlate_stalls_with_execution_samples
+from spw.tick_analysis import TICK_EVENT_TYPE, analyze_ticks, correlate_stalls_with_execution_samples
 
 # Field names grounded in a real captured com.spw.TickBoundary event (see
 # session notes): type, tickIndex, elapsedSeconds, startTime.
@@ -18,7 +18,7 @@ class TickAnalysisTests(unittest.TestCase):
             result = analyze_ticks(Path("jfr.exe"), Path("test.jfr"))
         self.assertFalse(result["ticks_available"])
         self.assertEqual(result["tick_count"], 0)
-        self.assertIsNone(result["read_limitation"])
+        self.assertEqual(result["event_reads"][TICK_EVENT_TYPE], {"status": "OK", "event_count": 0, "reason": None})
 
     def test_normal_ticks_have_no_stalls(self) -> None:
         with patch("spw.tick_analysis.read_events_with_status", return_value=(list(NORMAL_TICKS), None)):
@@ -39,7 +39,7 @@ class TickAnalysisTests(unittest.TestCase):
         with patch("spw.tick_analysis.read_events_with_status", return_value=([], "jfr_print_timed_out")):
             result = analyze_ticks(Path("jfr.exe"), Path("test.jfr"))
         self.assertFalse(result["ticks_available"])
-        self.assertEqual(result["read_limitation"], "jfr_print_timed_out")
+        self.assertEqual(result["event_reads"][TICK_EVENT_TYPE], {"status": "READ_FAILED", "event_count": None, "reason": "jfr_print_timed_out"})
         self.assertIn("jfr_print_timed_out", result["limitations"])
 
 

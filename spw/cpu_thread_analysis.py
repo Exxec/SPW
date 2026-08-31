@@ -4,7 +4,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from .jfr_events import event_thread_identity, read_events_with_status, resolve_thread_labels, top_frame
+from .jfr_events import event_read_status, event_thread_identity, read_events_with_status, resolve_thread_labels, top_frame
 
 _TOP_N = 25
 
@@ -25,31 +25,25 @@ def analyze_cpu_and_threads(
     them, to avoid parsing a potentially large recording twice; pass
     `execution_samples_limitation` alongside it if that read failed rather
     than genuinely finding zero events, so it is not silently indistinguishable
-    from "PASSIVE correctly has none". Any non-`None` entry in the returned
-    `read_limitations` means the corresponding count is not trustworthy as
-    "zero" -- it is "unknown".
+    from "PASSIVE correctly has none". The returned `event_reads` gives every
+    event type's `{"status", "event_count", "reason"}` record (see
+    `event_read_status`) -- a `"READ_FAILED"` status means the corresponding
+    count is not trustworthy as "zero", it is "unknown".
     """
 
-    read_limitations: dict[str, str] = {}
+    event_reads: dict[str, dict[str, Any]] = {}
     if execution_samples is None:
-        execution_samples, limitation = read_events_with_status(jfr_tool, recording_path, ["jdk.ExecutionSample"])
-        if limitation:
-            read_limitations["jdk.ExecutionSample"] = limitation
-    elif execution_samples_limitation:
-        read_limitations["jdk.ExecutionSample"] = execution_samples_limitation
+        execution_samples, execution_samples_limitation = read_events_with_status(jfr_tool, recording_path, ["jdk.ExecutionSample"])
+    event_reads["jdk.ExecutionSample"] = event_read_status(execution_samples, execution_samples_limitation)
 
     thread_cpu_loads, limitation = read_events_with_status(jfr_tool, recording_path, ["jdk.ThreadCPULoad"])
-    if limitation:
-        read_limitations["jdk.ThreadCPULoad"] = limitation
+    event_reads["jdk.ThreadCPULoad"] = event_read_status(thread_cpu_loads, limitation)
     thread_starts, limitation = read_events_with_status(jfr_tool, recording_path, ["jdk.ThreadStart"])
-    if limitation:
-        read_limitations["jdk.ThreadStart"] = limitation
+    event_reads["jdk.ThreadStart"] = event_read_status(thread_starts, limitation)
     thread_ends, limitation = read_events_with_status(jfr_tool, recording_path, ["jdk.ThreadEnd"])
-    if limitation:
-        read_limitations["jdk.ThreadEnd"] = limitation
+    event_reads["jdk.ThreadEnd"] = event_read_status(thread_ends, limitation)
     jvm_cpu_loads, limitation = read_events_with_status(jfr_tool, recording_path, ["jdk.CPULoad"])
-    if limitation:
-        read_limitations["jdk.CPULoad"] = limitation
+    event_reads["jdk.CPULoad"] = event_read_status(jvm_cpu_loads, limitation)
 
     # Grouping by name alone risks blending two distinct threads that
     # happen to share a name (a real pattern for pooled worker threads);
@@ -109,5 +103,5 @@ def analyze_cpu_and_threads(
             "still_running_at_capture_end": still_running,
         },
         "average_jvm_cpu": average_jvm_cpu,
-        "read_limitations": read_limitations,
+        "event_reads": event_reads,
     }

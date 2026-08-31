@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .jfr_events import parse_jfr_timestamp, read_events_with_status
+from .jfr_events import event_read_status, parse_jfr_timestamp, read_events_with_status
 
 
 def analyze_startup(jfr_tool: Path, recording_path: Path) -> dict[str, Any]:
@@ -17,13 +17,11 @@ def analyze_startup(jfr_tool: Path, recording_path: Path) -> dict[str, Any]:
     events for when it is not.
     """
 
-    read_limitations: dict[str, str] = {}
+    event_reads: dict[str, dict[str, Any]] = {}
     class_loading, limitation = read_events_with_status(jfr_tool, recording_path, ["jdk.ClassLoadingStatistics"])
-    if limitation:
-        read_limitations["jdk.ClassLoadingStatistics"] = limitation
+    event_reads["jdk.ClassLoadingStatistics"] = event_read_status(class_loading, limitation)
     execution_samples, limitation = read_events_with_status(jfr_tool, recording_path, ["jdk.ExecutionSample"])
-    if limitation:
-        read_limitations["jdk.ExecutionSample"] = limitation
+    event_reads["jdk.ExecutionSample"] = event_read_status(execution_samples, limitation)
 
     # A `DEEP_DIAGNOSTIC` capture can carry hundreds of thousands of
     # execution samples; only the minimum timestamp is ever needed from
@@ -65,5 +63,5 @@ def analyze_startup(jfr_tool: Path, recording_path: Path) -> dict[str, Any]:
             "events; time_to_first_execution_sample_seconds is a rough proxy only, and the class-loading curve "
             "reflects overall JVM class loading, not Starsector-specific milestones."
         ),
-        "read_limitations": read_limitations,
+        "event_reads": event_reads,
     }

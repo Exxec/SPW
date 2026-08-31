@@ -17,7 +17,17 @@ MATERIAL_VARIABLES = (
 
 
 def _java_major(environment: dict[str, Any]) -> int | None:
-    version = (environment.get("java") or {}).get("java_version") or ""
+    """Prefer the actual target JVM's version over the tooling JDK's.
+
+    `target_jvm` is only populated after an attach-mode capture (via
+    `jcmd <pid> VM.version`, run against the profiled process itself); it
+    can differ from `java` (the tooling JDK fingerprinted from `--java`) --
+    e.g. a Mikohime-managed Java 27/28 setup attached to from a different
+    JDK. Falling back to `java` keeps inventory-only snapshots (no capture,
+    so no target JVM to query) working as before.
+    """
+
+    version = (environment.get("target_jvm") or {}).get("jdk_version") or (environment.get("java") or {}).get("java_version") or ""
     match = _JAVA_MAJOR.match(version)
     return int(match.group(1)) if match else None
 

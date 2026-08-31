@@ -94,3 +94,14 @@ Now that the SPW Tick Marker mod makes real `com.spw.TickBoundary` events possib
 
 **Why:** A user who captured 20 minutes at `DEEP_DIAGNOSTIC` and gets an empty CPU report has no way to tell "the game was idle" from "the analysis silently timed out" — exactly the kind of ambiguity the design's evidence-and-limitations discipline is meant to prevent.
 **Fits at:** a `read_events` signature change (returning a status/limitation alongside the list) that touches every analyzer built on it, so batch it with other V0.4–V0.6 hardening rather than doing it piecemeal.
+
+## 14. Distinguish the tooling JDK from the target JVM in attach mode
+
+Done — see the progress log's 2026-08-31 "Target JVM fingerprinting" entries. Kept here for the record: attach mode originally only ever fingerprinted the `--java`/`--jcmd` executable (the tooling JDK), never the JVM actually running the attached process, which is a real gap for Mikohime/alternate-JDK setups where the two differ.
+
+## 15. A real flame graph in the HTML viewer
+
+The static HTML viewer's CPU/allocation sections (now sortable tables, see the 2026-08-31 progress-log entry) still only show a flat top-N list of the *single hottest frame* per sample. A flame graph — the standard way to read a profile, and the thing JDK Mission Control has that SPW doesn't — needs the full call stack per sample aggregated into a tree, not just the top frame, plus SVG/canvas rendering logic to draw it.
+
+**Why:** This is the single biggest remaining readability gap against JMC identified when the user asked "is this better than the bundled Java profiler, are results easier to interpret?" — SPW wins on Starsector-specific context (mod attribution, comparability gating) but loses on general profiling ergonomics; a flame graph would close most of that gap using data SPW already collects (`jfr_events.stack_class_names` already walks the full stack, it's just not retained past the top frame in the current aggregation).
+**Fits at:** a genuine, standalone piece of work — full-stack aggregation in `cpu_thread_analysis.py`/`allocation_gc_analysis.py` plus a hand-rolled SVG renderer in `report_viewer.py` (no external charting library, per the viewer's own no-network/no-external-script constraint). Not a "cheap win"; scope it as its own item rather than folding it into unrelated work.

@@ -24,23 +24,15 @@ def jfr_tool_path(java_executable: Path | None, explicit: Path | None) -> Path |
     return None
 
 
-def read_events(jfr_tool: Path, recording_path: Path, event_types: Iterable[str]) -> list[dict[str, Any]]:
+def read_events_with_status(jfr_tool: Path, recording_path: Path, event_types: Iterable[str]) -> tuple[list[dict[str, Any]], str | None]:
     """Read the requested JFR event types from a recording via `jfr print --json`.
 
     Each returned dict is the event's `values` payload with its event
-    `type` name merged in. Returns an empty list (rather than raising) if
-    the `jfr` tool is unavailable, the recording cannot be read, or output
-    cannot be parsed -- callers must treat that as "no evidence available",
-    not "zero events occurred". Use `read_events_with_status` to tell those
-    apart from a genuine zero-event result.
-    """
-
-    events, _limitation = read_events_with_status(jfr_tool, recording_path, event_types)
-    return events
-
-
-def read_events_with_status(jfr_tool: Path, recording_path: Path, event_types: Iterable[str]) -> tuple[list[dict[str, Any]], str | None]:
-    """Like `read_events`, but also returns why an empty list might not mean "genuinely zero events".
+    `type` name merged in. Also returns why an empty list might not mean
+    "genuinely zero events" -- there is no plain `read_events` that
+    discards this: every caller must handle the distinction explicitly,
+    typically via `event_read_status`, rather than silently treating a
+    failed read as a confirmed zero.
 
     The second element is `None` on success -- including a real, positive
     zero-event result (e.g. a `PASSIVE` recording correctly has no
@@ -69,6 +61,24 @@ def read_events_with_status(jfr_tool: Path, recording_path: Path, event_types: I
         return [], "jfr_print_output_unparseable"
     events = data.get("recording", {}).get("events", [])
     return [{"type": event.get("type"), **event.get("values", {})} for event in events], None
+
+
+def event_read_status(events: list[dict[str, Any]], limitation: str | None) -> dict[str, Any]:
+    """Build the canonical per-event-type read-status record for one `read_events_with_status` call.
+
+    A bare event count is ambiguous: zero can mean "genuinely no events" or
+    "the read failed and returned nothing". This makes that distinction an
+    explicit, machine-checkable field instead of something a reader has to
+    infer by separately checking a limitations string:
+    `{"status": "OK", "event_count": N, "reason": None}` (N may be 0 -- a
+    confirmed, genuine zero) only when the read itself succeeded;
+    `{"status": "READ_FAILED", "event_count": None, "reason": limitation}`
+    otherwise, so a failed read is never mistaken for a real zero.
+    """
+
+    if limitation is not None:
+        return {"status": "READ_FAILED", "event_count": None, "reason": limitation}
+    return {"status": "OK", "event_count": len(events), "reason": None}
 
 
 def parse_iso_duration_seconds(value: str | None) -> float | None:

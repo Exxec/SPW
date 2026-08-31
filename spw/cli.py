@@ -22,7 +22,7 @@ from .jfr_events import jfr_tool_path
 from .mod_inventory import build_inventory
 from .models import FingerprintResult
 from .overhead import estimate_attach_overhead
-from .report import write_artifacts
+from .report import render_markdown, write_artifacts
 from .report_viewer import render_html_report
 from .runtime_capability import detect_runtime_capabilities, register_detector
 from .save_fingerprint import find_saves, parse_save_descriptor
@@ -268,6 +268,12 @@ def _run_capture(args: argparse.Namespace) -> int:
     (output / "capture-descriptor.json").write_text(json.dumps(descriptor, indent=2, sort_keys=True), encoding="utf-8")
     if overhead_estimate is not None:
         (output / "collector-overhead.json").write_text(json.dumps(overhead_estimate, indent=2, sort_keys=True), encoding="utf-8")
+    # Findings raised during capture (e.g. jcmd-unavailable, jfr-start-failed,
+    # tooling-jdk-target-jvm-version-mismatch) have nowhere else to land in
+    # the standalone `capture` subcommand -- there is no inventory stage
+    # here to fold them into environment.json, unlike `diagnose`. Without
+    # this they are silently discarded.
+    (output / "findings.json").write_text(json.dumps(result.findings_dict(), indent=2, sort_keys=True), encoding="utf-8")
 
     report_path = output / "CAPTURE_REPORT.md"
     lines = [
@@ -277,15 +283,42 @@ def _run_capture(args: argparse.Namespace) -> int:
         f"- Level: {descriptor.get('level')}",
         f"- Target: {descriptor['target']}",
     ]
+    tooling_jdk = descriptor.get("tooling_jdk")
+    target_jvm = descriptor.get("target_jvm")
+    if tooling_jdk is not None:
+        lines.append(f"- Profiler tooling JDK: {tooling_jdk.get('implementor', 'UNKNOWN')} {tooling_jdk.get('java_version', 'UNKNOWN')}")
+    if target_jvm is not None:
+        if target_jvm.get("jdk_version"):
+            lines.append(f"- Target JVM (the process actually being profiled): {target_jvm.get('vm_name', 'UNKNOWN')} {target_jvm.get('jdk_version', 'UNKNOWN')}")
+        else:
+            lines.append(f"- Target JVM: could not be determined ({target_jvm.get('limitation', 'unknown reason')})")
     if descriptor.get("output_path"):
         lines.append(f"- Recording: `{descriptor['output_path']}`")
     if overhead_estimate is not None:
         lines.append(f"- Estimated collector overhead: {overhead_estimate.get('estimated_overhead_fraction')} (confidence: {overhead_estimate.get('confidence')})")
     if descriptor.get("incomplete_reason"):
         lines.append(f"- Limitation: {descriptor['incomplete_reason']}")
+    lines.extend(["", "## Findings", ""])
+    if not result.findings:
+        lines.append("No findings.")
+    for finding in result.findings:
+        lines.append(f"### [{finding.confidence}] {finding.id}")
+        lines.append("")
+        lines.append(f"- Category: {finding.category}")
+        lines.append(f"- Severity: {finding.severity}")
+        lines.append(f"- {finding.explanation}")
+        if finding.evidence:
+            lines.append(f"- Evidence: {', '.join(finding.evidence)}")
+        lines.append("")
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     print(f"Capture type: {descriptor['capture_type']} (level: {descriptor.get('level')})")
+    if tooling_jdk is not None:
+        print(f"Profiler tooling JDK: {tooling_jdk.get('implementor', 'UNKNOWN')} {tooling_jdk.get('java_version', 'UNKNOWN')}")
+    if target_jvm is not None and target_jvm.get("jdk_version"):
+        print(f"Target JVM: {target_jvm.get('vm_name', 'UNKNOWN')} {target_jvm.get('jdk_version', 'UNKNOWN')}")
+    if result.findings:
+        print(f"Findings: {len(result.findings)} (see findings.json / CAPTURE_REPORT.md)")
     if descriptor.get("output_path"):
         print(f"Recording: {descriptor['output_path']}")
     if descriptor.get("incomplete_reason"):
@@ -582,6 +615,21 @@ def _run_diagnose(args: argparse.Namespace) -> int:
         capture_descriptor = run_attach_capture(result, pid=args.attach_pid, output_file=output_file, duration_seconds=args.duration, level=args.level, jcmd_path=args.jcmd, java_executable=args.java)
         (capture_dir / "capture-descriptor.json").write_text(json.dumps(capture_descriptor, indent=2, sort_keys=True), encoding="utf-8")
 
+        if capture_descriptor.get("target_jvm"):
+            # Only known once the attach has actually happened, so the
+            # inventory's environment.json (already written above) is
+            # re-persisted here to include it -- this is what a later `spw
+            # compare` run reads, and it must reflect the JVM that actually
+            # ran the profiled process, not just the tooling JDK that was
+            # known at inventory time.
+            result.target_jvm = capture_descriptor["target_jvm"]
+            inventory_paths["environment"].write_text(json.dumps(result.environment_dict(), indent=2, sort_keys=True), encoding="utf-8")
+        # Re-render PERFORMANCE_REPORT.md now that the capture descriptor
+        # (and, above, the target JVM) is known -- write_artifacts() was
+        # called before capture, at a point when there was nothing to
+        # report here yet.
+        inventory_paths["report"].write_text(render_markdown(result, capture_descriptor), encoding="utf-8")
+
         # Best-effort: the most-recently-modified save is the one most
         # likely to be the actively-played campaign during this capture --
         # a reasonable proxy, not a certainty (nothing outside the game
@@ -642,6 +690,14 @@ def _run_diagnose(args: argparse.Namespace) -> int:
     ]
     if capture_descriptor is not None:
         report_lines.append(f"- Capture: {capture_descriptor['capture_type']} at level {capture_descriptor.get('level')}")
+        tooling_jdk = capture_descriptor.get("tooling_jdk")
+        target_jvm = capture_descriptor.get("target_jvm")
+        if tooling_jdk:
+            report_lines.append(f"  - Profiler tooling JDK: {tooling_jdk.get('implementor', 'UNKNOWN')} {tooling_jdk.get('java_version', 'UNKNOWN')}")
+        if target_jvm and target_jvm.get("jdk_version"):
+            report_lines.append(f"  - Target JVM (the process actually being profiled): {target_jvm.get('vm_name', 'UNKNOWN')} {target_jvm.get('jdk_version', 'UNKNOWN')}")
+        elif target_jvm:
+            report_lines.append(f"  - Target JVM: could not be determined ({target_jvm.get('limitation', 'unknown reason')})")
         if capture_descriptor.get("incomplete_reason"):
             report_lines.append(f"  - Limitation: {capture_descriptor['incomplete_reason']}")
     else:

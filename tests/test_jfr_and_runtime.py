@@ -9,10 +9,10 @@ from spw.capture_levels import LEVELS, jfc_path
 import subprocess
 
 from spw.jfr_events import (
+    event_read_status,
     event_thread_identity,
     event_thread_name,
     parse_iso_duration_seconds,
-    read_events,
     read_events_with_status,
     resolve_thread_labels,
     stack_class_names,
@@ -136,20 +136,28 @@ class JfrEventsTests(unittest.TestCase):
         labels = resolve_thread_labels(identity for identity in identities)
         self.assertEqual(labels, {("a", 1): "a", ("b", 2): "b"})
 
-    def test_read_events_parses_real_shaped_json_and_merges_type(self) -> None:
+    def test_read_events_with_status_parses_real_shaped_json_and_merges_type(self) -> None:
         fake_stdout = json.dumps({"recording": {"events": [REAL_EXECUTION_SAMPLE, REAL_CPU_LOAD_EVENT]}})
         with patch("spw.jfr_events.subprocess.run") as mock_run:
             mock_run.return_value.stdout = fake_stdout
             mock_run.return_value.returncode = 0
-            events = read_events(Path("jfr.exe"), Path("test.jfr"), ["jdk.ExecutionSample", "jdk.CPULoad"])
+            events, limitation = read_events_with_status(Path("jfr.exe"), Path("test.jfr"), ["jdk.ExecutionSample", "jdk.CPULoad"])
+        self.assertIsNone(limitation)
         self.assertEqual(len(events), 2)
         self.assertEqual(events[0]["type"], "jdk.ExecutionSample")
         self.assertEqual(events[1]["jvmUser"], 0.05)
+        self.assertEqual(event_read_status(events, limitation), {"status": "OK", "event_count": 2, "reason": None})
 
-    def test_read_events_returns_empty_list_on_failure(self) -> None:
+    def test_read_events_with_status_returns_empty_list_and_reason_on_failure(self) -> None:
         with patch("spw.jfr_events.subprocess.run", side_effect=OSError("no such tool")):
-            events = read_events(Path("missing-jfr.exe"), Path("test.jfr"), ["jdk.CPULoad"])
+            events, limitation = read_events_with_status(Path("missing-jfr.exe"), Path("test.jfr"), ["jdk.CPULoad"])
         self.assertEqual(events, [])
+        self.assertEqual(limitation, "jfr_print_os_error")
+        self.assertEqual(event_read_status(events, limitation), {"status": "READ_FAILED", "event_count": None, "reason": "jfr_print_os_error"})
+
+    def test_event_read_status_distinguishes_genuine_zero_from_read_failure(self) -> None:
+        self.assertEqual(event_read_status([], None), {"status": "OK", "event_count": 0, "reason": None})
+        self.assertEqual(event_read_status([], "jfr_print_timed_out"), {"status": "READ_FAILED", "event_count": None, "reason": "jfr_print_timed_out"})
 
     def test_read_events_with_status_distinguishes_failure_reasons(self) -> None:
         cases = [

@@ -41,6 +41,14 @@ def render_markdown(result: FingerprintResult, capture: dict[str, object] | None
     else:
         lines.append(f"- Type: {capture.get('capture_type')}")
         lines.append(f"- Target: {capture.get('target')}")
+        tooling_jdk = capture.get("tooling_jdk")
+        target_jvm = capture.get("target_jvm")
+        if tooling_jdk:
+            lines.append(f"- Profiler tooling JDK: {tooling_jdk.get('implementor', 'UNKNOWN')} {tooling_jdk.get('java_version', 'UNKNOWN')}")
+        if target_jvm and target_jvm.get("jdk_version"):
+            lines.append(f"- Target JVM (the process actually being profiled): {target_jvm.get('vm_name', 'UNKNOWN')} {target_jvm.get('jdk_version', 'UNKNOWN')}")
+        elif target_jvm:
+            lines.append(f"- Target JVM: could not be determined ({target_jvm.get('limitation', 'unknown reason')})")
         if capture.get("output_path"):
             lines.append(f"- Recording: `{capture['output_path']}`")
         if capture.get("incomplete_reason"):
