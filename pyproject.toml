@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "starsector-performance-workbench"
+version = "0.1.0"
+description = "Independent, offline runtime-profiling and benchmarking workbench for Starsector installations"
+requires-python = ">=3.10"
+
+[project.scripts]
+spw = "spw.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["spw*"]
+
+[tool.setuptools.package-data]
+spw = ["jfc/*.jfc"]

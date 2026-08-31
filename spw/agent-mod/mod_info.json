@@ -1,0 +1,10 @@
+{
+	"id":"spw_tick_marker",
+	"name":"SPW Tick Marker",
+	"author":"Starsector Performance Workbench",
+	"version":"0.1.0",
+	"description":"Emits a custom JFR event once per campaign-engine tick, for SPW DEEP_DIAGNOSTIC captures. Adds no gameplay content and changes no game behavior; this is diagnostic instrumentation only.",
+	"gameVersion":"0.98a-RC8",
+	"jars":["jars/spw-tick-marker.jar"],
+	"modPlugin":"com.spw.tickmarker.SpwTickMarkerModPlugin"
+}
