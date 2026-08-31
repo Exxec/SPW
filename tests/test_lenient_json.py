@@ -43,6 +43,26 @@ class LenientJsonTests(unittest.TestCase):
         text = '{"source": "https://example.com/mod"}'
         self.assertEqual(loads(text), {"source": "https://example.com/mod"})
 
+    def test_slashes_inside_single_quoted_url_are_preserved(self) -> None:
+        # Comment stripping runs before single-quote conversion, so at that
+        # point this is still a single-quoted (not yet double-quoted)
+        # scalar -- _strip_comments must recognize a single-quoted span or
+        # it misreads the "//" here as a comment start.
+        text = "{'source': 'https://example.com/mod'}"
+        self.assertEqual(loads(text), {"source": "https://example.com/mod"})
+
+    def test_hash_inside_single_quoted_value_is_preserved(self) -> None:
+        # Same root cause as above: a "#" in a scalar value is data, not a
+        # comment, even while the value is still single-quoted.
+        text = "{'description': 'costs #500 credits'}"
+        self.assertEqual(loads(text), {"description": "costs #500 credits"})
+
+    def test_unterminated_single_quoted_scalar_is_rejected(self) -> None:
+        # Fallback normalization must not "repair" malformed quotes by
+        # treating a missing closing quote as the string ending at EOF.
+        with self.assertRaises(ValueError):
+            loads("'unterminated")
+
     def test_combination_matching_a_real_mod_info_shape(self) -> None:
         text = (
             "# generated file\n"

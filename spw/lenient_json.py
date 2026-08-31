@@ -7,27 +7,36 @@ _WHITESPACE = " \t\r\n"
 
 
 def _strip_comments(text: str) -> str:
-    """Remove `#` and `//` line comments, but never inside a quoted string."""
+    """Remove `#` and `//` line comments, but never inside a single- or double-quoted string.
+
+    Single quotes are not valid JSON syntax, but this pass runs before
+    `_convert_single_quoted_strings` -- at this point a real mod's
+    single-quoted scalar (e.g. a URL like `'https://example.com/mod'`, or
+    a value like `'costs #500 credits'`) is still single-quoted, so `#`/`//`
+    inside it must not be mistaken for the start of a comment. Tracking
+    only double quotes (as an earlier version of this function did) let
+    exactly that happen.
+    """
 
     result: list[str] = []
-    in_string = False
+    string_delim: str | None = None
     escape = False
     i = 0
     length = len(text)
     while i < length:
         char = text[i]
-        if in_string:
+        if string_delim is not None:
             result.append(char)
             if escape:
                 escape = False
             elif char == "\\":
                 escape = True
-            elif char == '"':
-                in_string = False
+            elif char == string_delim:
+                string_delim = None
             i += 1
             continue
-        if char == '"':
-            in_string = True
+        if char in "\"'":
+            string_delim = char
             result.append(char)
             i += 1
             continue
@@ -81,6 +90,12 @@ def _convert_single_quoted_strings(text: str) -> str:
                     continue
                 content.append(text[j])
                 j += 1
+            if j >= length:
+                # Ran out of input looking for the closing quote -- this is
+                # malformed, not a string that happens to end at end-of-file.
+                # Silently treating it as one would "repair" the input
+                # instead of surfacing it as invalid.
+                raise ValueError(f"Unterminated single-quoted string starting at position {i}")
             inner = "".join(content).replace("\\", "\\\\").replace('"', '\\"')
             result.append(f'"{inner}"')
             i = j + 1
