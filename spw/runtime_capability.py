@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -154,38 +155,105 @@ def _detect_fast_rendering(context: DetectorContext) -> list[dict[str, Any]]:
     ]
 
 
+_FR_RESOURCE_CACHE_JAR = "fr-resource-cache-agent.jar"
+
+
 def _detect_fast_rendering_resource_cache(context: DetectorContext) -> list[dict[str, Any]]:
-    try:
-        candidates = list(context.installation_path.iterdir())
-    except OSError:
-        candidates = []
-    matches = [path.name for path in candidates if "resourcecache" in path.name.lower().replace("-", "").replace("_", "").replace(" ", "")]
-    if not matches:
+    """Detect FR Resource Cache from its real, documented installation layout.
+
+    Confirmed against the actual distribution (v0.3): the agent jar is
+    copied into `starsector-core/` alongside `fr.jar`/`fr.agent.jar`, wired
+    in via a `-javaagent:fr-resource-cache-agent.jar` line appended to
+    `starsector-core/fr.vmparams`, and it maintains its own cache directory
+    at the installation root (`fr-resource-cache/`, holding `resources.pack`/
+    `resources.index`/`cache.lock`). Each is kept as distinct evidence so a
+    reader can judge "present" versus "wired into the actual launch" versus
+    "has run at least once" for themselves, the same distinction already
+    made for FastRendering itself.
+    """
+
+    installation_path = context.installation_path
+    evidence: list[str] = []
+    if (installation_path / "starsector-core" / _FR_RESOURCE_CACHE_JAR).is_file():
+        evidence.append(f"starsector-core/{_FR_RESOURCE_CACHE_JAR}")
+    vmparams_path = installation_path / "starsector-core" / "fr.vmparams"
+    if vmparams_path.is_file():
+        try:
+            text = vmparams_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            text = ""
+        if f"-javaagent:{_FR_RESOURCE_CACHE_JAR}" in text:
+            evidence.append("starsector-core/fr.vmparams (javaagent entry)")
+    if (installation_path / "fr-resource-cache").is_dir():
+        evidence.append("fr-resource-cache/")
+
+    if not evidence:
         return [_record("FastRenderingResourceCache", "NOT_DETECTED")]
     return [
         _record(
             "FastRenderingResourceCache",
             "ENABLED",
-            evidence=matches,
-            unsupported_assumptions=["No confirmed public fingerprint for FR Resource Cache is documented; this matches a generic name pattern only and should be treated as low-confidence until a concrete fingerprint is available."],
+            evidence=sorted(set(evidence)),
+            unsupported_assumptions=["Confirms the agent jar and/or its javaagent wiring and/or its cache directory are present; does not confirm the `[FR Resource Cache]` console messages the real tool prints actually appeared at runtime."],
         )
     ]
 
 
+_PREPATCHER_MOD_ID = "starsector_prepatcher"
+_PREPATCHER_AGENT_JAR_NAME = "StarsectorPrepatcherAgent.jar"
+
+
 def _detect_prepatcher(context: DetectorContext) -> list[dict[str, Any]]:
+    """Detect StarsectorPrepatcher from its real, documented installation layout.
+
+    Confirmed against the actual distribution (v0.18.4): unlike Fast
+    Rendering, this installs as an ordinary mod under `mods/` (its own
+    `mod_info.json` declares id `starsector_prepatcher`) -- a root-level
+    folder-name heuristic would never find it there. It additionally
+    requires a `-javaagent:.../StarsectorPrepatcherAgent.jar` line in
+    `vmparams` (or `fr.vmparams`, if combined with Fast Rendering) to
+    actually take effect; "installed as a mod" and "wired into the launch"
+    are kept as distinct evidence rather than conflated.
+    """
+
+    installation_path = context.installation_path
+    evidence: list[str] = []
+    mods_dir = installation_path / "mods"
     try:
-        candidates = list(context.installation_path.iterdir())
+        mod_dirs = [path for path in mods_dir.iterdir() if path.is_dir()] if mods_dir.is_dir() else []
     except OSError:
-        candidates = []
-    matches = [path.name for path in candidates if "prepatch" in path.name.lower()]
-    if not matches:
+        mod_dirs = []
+    for mod_dir in mod_dirs:
+        for info_name in ("mod_info.json", "mod_info.json.disabled"):
+            info_path = mod_dir / info_name
+            if not info_path.is_file():
+                continue
+            try:
+                declared = json.loads(info_path.read_text(encoding="utf-8-sig"))
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+                continue
+            if isinstance(declared, dict) and declared.get("id") == _PREPATCHER_MOD_ID:
+                evidence.append(f"mods/{mod_dir.name}/{info_name}")
+
+    for vmparams_name in ("vmparams", "vmparams.txt", "starsector-core/fr.vmparams"):
+        vmparams_path = installation_path / vmparams_name
+        if not vmparams_path.is_file():
+            continue
+        try:
+            text = vmparams_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if _PREPATCHER_AGENT_JAR_NAME in text:
+            evidence.append(f"{vmparams_name} (javaagent entry)")
+
+    if not evidence:
         return [_record("StarsectorPrepatcher", "NOT_DETECTED")]
     return [
         _record(
             "StarsectorPrepatcher",
             "ENABLED",
-            evidence=matches,
-            unsupported_assumptions=["No confirmed public fingerprint for the prepatcher is documented; this matches a generic name pattern only and should be treated as low-confidence until a concrete fingerprint is available."],
+            evidence=sorted(set(evidence)),
+            unsupported_assumptions=["Confirms the mod is installed under mods/ and/or the javaagent is wired into vmparams; does not confirm the agent successfully patched anything at runtime (the game's own log carries Prepatcher's patch-status lines for that)."],
         )
     ]
 

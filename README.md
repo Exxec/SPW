@@ -50,7 +50,7 @@ Capture is opt-in and explicit: SPW never launches or attaches to a process with
 
 `spw/agent-mod` is an ordinary Starsector mod, not part of the `spw` Python package, that emits a `com.spw.TickBoundary` JFR event once per campaign tick. It uses only the public `EveryFrameScript`/`ModPlugin` modding API — it does not instrument, patch, or otherwise touch Starsector's own classes.
 
-To use it: copy `spw/agent-mod/` into the target installation's `mods/` directory (so `mods/agent-mod/mod_info.json` exists) and enable `spw_tick_marker` like any other mod. A `DEEP_DIAGNOSTIC` capture will then include tick-boundary events; `spw analyze` reports them in `tick-analysis.json` regardless of whether the mod is present (`ticks_available: false` with an explanatory limitation, not an error, when it isn't installed or enabled).
+To use it: copy `releases/spw-tick-marker/` (or extract `releases/spw-tick-marker.zip`) into the target installation's `mods/` directory (so `mods/spw-tick-marker/mod_info.json` exists) and enable `spw_tick_marker` like any other mod. This is a prebuilt, runtime-only copy (`mod_info.json` + the compiled jar, no source) meant to be dropped in directly; `spw/agent-mod/` remains the source of truth if you need to rebuild it. A `DEEP_DIAGNOSTIC` capture will then include tick-boundary events; `spw analyze` reports them in `tick-analysis.json` regardless of whether the mod is present (`ticks_available: false` with an explanatory limitation, not an error, when it isn't installed or enabled).
 
 To rebuild the jar after editing its source (requires a local Starsector install for `starfarer.api.jar`):
 
@@ -58,6 +58,8 @@ To rebuild the jar after editing its source (requires a local Starsector install
 javac -cp "C:\path\to\Starsector\starsector-core\starfarer.api.jar" -d build --release 17 spw\agent-mod\src\com\spw\tickmarker\*.java
 jar --create --file spw\agent-mod\jars\spw-tick-marker.jar -C build .
 ```
+
+After rebuilding, regenerate `releases/` from the updated `spw/agent-mod/` (copy `mod_info.json` and `jars/spw-tick-marker.jar` into `releases/spw-tick-marker/`, then re-zip it) so the prebuilt copy doesn't drift from source.
 
 ## Safety
 
@@ -68,9 +70,9 @@ jar --create --file spw\agent-mod\jars\spw-tick-marker.jar -C build .
 
 ## Status
 
-V0.1 through V1.0 all have a first working implementation, including the `DEEP_DIAGNOSTIC` tick-boundary event and its tick-indexed sample correlation, GPU/driver fingerprinting, native crash-log ingestion, a local HTML report viewer, cached JAR indexing, and a third-party detector extension point — see [docs/PERFORMANCE_WORKBENCH_ROADMAP.md](docs/PERFORMANCE_WORKBENCH_ROADMAP.md) and [docs/PERFORMANCE_WORKBENCH_RECOMMENDATIONS.md](docs/PERFORMANCE_WORKBENCH_RECOMMENDATIONS.md) for what is genuinely evidence-backed today versus an explicitly-surfaced limitation (rendering diagnostics, Fast Rendering Resource Cache/Prepatcher detection, and save-complexity fingerprinting are all intentionally scoped down and documented as such).
+V0.1 through V1.0 all have a first working implementation, including the `DEEP_DIAGNOSTIC` tick-boundary event and its tick-indexed sample correlation, GPU/driver fingerprinting, native crash-log ingestion, a local HTML report viewer, cached JAR indexing, and a third-party detector extension point — see [docs/PERFORMANCE_WORKBENCH_ROADMAP.md](docs/PERFORMANCE_WORKBENCH_ROADMAP.md) and [docs/PERFORMANCE_WORKBENCH_RECOMMENDATIONS.md](docs/PERFORMANCE_WORKBENCH_RECOMMENDATIONS.md) for what is genuinely evidence-backed today versus an explicitly-surfaced limitation (save-complexity fingerprinting remains intentionally scoped down; rendering-thread identification and Fast Rendering Resource Cache/Prepatcher detection were both upgraded from generic pattern-matching to real, documented-layout fingerprints after live validation, see below).
 
-`spw inventory` has been run read-only against a real, heavily modded installation (155 mods); the capture/analyze pipeline and the Tick Marker mod have been validated against a synthetic Java test harness and real `jcmd`/`jfr` tooling, including a real injected CPU stall correctly isolated via tick correlation — but **not yet against a live Starsector process**. That's the one deliberately-deferred milestone left; see the progress log for detail.
+**Both live-Starsector validation passes have happened.** SPW attached to and captured from a real running Starsector process, with the Tick Marker mod installed and enabled by the actual game (previously only ever exercised against a synthetic Java test harness). Pass 1 (near-vanilla, isolating first-load risk) fired 9,377 real `com.spw.TickBoundary` events correctly and caught a real gap — rendering-thread identification by name alone missed the actual dominant render thread (a JVM-default-named thread doing 86% of the real work), now fixed with a second, stack-content-based signal. Pass 2 (the real ~154-mod install, full `DEEP_DIAGNOSTIC`) pushed 15,946 execution samples with zero read failures, correctly attributed CPU samples across ~50 distinct real mods, and correctly flagged `NOT_COMPARABLE` when compared against pass 1 for three simultaneous real changes (Java 27→28, JVM arguments, and the mod set) rather than risking a false conclusion. See the progress log for full detail on both.
 
 Run the test suite with:
 

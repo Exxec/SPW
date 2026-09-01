@@ -219,16 +219,67 @@ class RuntimeCapabilityTests(unittest.TestCase):
             self.assertTrue(by_id["MikohimeConfiguration"]["parsed_configuration"]["fast_rendering"])
             self.assertEqual(by_id["FastRendering"]["state"], "ENABLED")
 
-    def test_resource_cache_and_prepatcher_are_low_confidence_pattern_matches(self) -> None:
+    def test_resource_cache_and_prepatcher_not_detected_without_their_real_markers(self) -> None:
+        # A generic name-substring match (the old heuristic) would have
+        # falsely matched these; the real fingerprint should not.
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "resource-cache").mkdir()
-            (root / "prepatcher.jar").write_text("", encoding="utf-8")
+            (root / "resource-cache-notes.txt").write_text("", encoding="utf-8")
+            (root / "prepatcher-changelog.md").write_text("", encoding="utf-8")
+            capabilities = detect_runtime_capabilities(root, {"source": "UNAVAILABLE"}, {})
+            by_id = {c["id"]: c for c in capabilities}
+            self.assertEqual(by_id["FastRenderingResourceCache"]["state"], "NOT_DETECTED")
+            self.assertEqual(by_id["StarsectorPrepatcher"]["state"], "NOT_DETECTED")
+
+    def test_fast_rendering_resource_cache_detected_from_real_installation_layout(self) -> None:
+        # Confirmed against the real v0.3 distribution: the agent jar sits
+        # in starsector-core/ alongside fr.jar/fr.vmparams, is wired in via
+        # a -javaagent line appended to fr.vmparams, and maintains its own
+        # cache directory at the installation root.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "starsector-core").mkdir()
+            (root / "starsector-core" / "fr-resource-cache-agent.jar").write_bytes(b"")
+            (root / "starsector-core" / "fr.vmparams").write_text("-javaagent:fr.agent.jar\n-javaagent:fr-resource-cache-agent.jar\n", encoding="utf-8")
+            (root / "fr-resource-cache").mkdir()
             capabilities = detect_runtime_capabilities(root, {"source": "UNAVAILABLE"}, {})
             by_id = {c["id"]: c for c in capabilities}
             self.assertEqual(by_id["FastRenderingResourceCache"]["state"], "ENABLED")
-            self.assertTrue(by_id["FastRenderingResourceCache"]["unsupported_assumptions"])
+            self.assertIn("starsector-core/fr-resource-cache-agent.jar", by_id["FastRenderingResourceCache"]["evidence"])
+            self.assertIn("starsector-core/fr.vmparams (javaagent entry)", by_id["FastRenderingResourceCache"]["evidence"])
+            self.assertIn("fr-resource-cache/", by_id["FastRenderingResourceCache"]["evidence"])
+
+    def test_prepatcher_detected_as_an_installed_mod_and_wired_javaagent(self) -> None:
+        # Confirmed against the real v0.18.4 distribution: unlike Fast
+        # Rendering, this installs as an ordinary mod under mods/ (its own
+        # mod_info.json declares id starsector_prepatcher) plus a
+        # -javaagent line in vmparams naming StarsectorPrepatcherAgent.jar.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            mod_dir = root / "mods" / "StarsectorPrepatcher"
+            mod_dir.mkdir(parents=True)
+            (mod_dir / "mod_info.json").write_text(json.dumps({"id": "starsector_prepatcher", "gameVersion": "0.98a-RC8"}), encoding="utf-8")
+            (root / "vmparams").write_text("-javaagent:../mods/StarsectorPrepatcher/agent/StarsectorPrepatcherAgent.jar -classpath .\n", encoding="utf-8")
+            capabilities = detect_runtime_capabilities(root, {"source": "UNAVAILABLE"}, {})
+            by_id = {c["id"]: c for c in capabilities}
             self.assertEqual(by_id["StarsectorPrepatcher"]["state"], "ENABLED")
+            self.assertIn("mods/StarsectorPrepatcher/mod_info.json", by_id["StarsectorPrepatcher"]["evidence"])
+            self.assertIn("vmparams (javaagent entry)", by_id["StarsectorPrepatcher"]["evidence"])
+
+    def test_prepatcher_installed_as_mod_but_javaagent_not_wired_is_still_evidence(self) -> None:
+        # "Installed under mods/" and "wired into the launch" are kept as
+        # distinct evidence rather than conflated into one all-or-nothing check.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            mod_dir = root / "mods" / "StarsectorPrepatcher"
+            mod_dir.mkdir(parents=True)
+            (mod_dir / "mod_info.json").write_text(json.dumps({"id": "starsector_prepatcher", "gameVersion": "0.98a-RC8"}), encoding="utf-8")
+            capabilities = detect_runtime_capabilities(root, {"source": "UNAVAILABLE"}, {})
+            by_id = {c["id"]: c for c in capabilities}
+            self.assertEqual(by_id["StarsectorPrepatcher"]["state"], "ENABLED")
+            evidence = by_id["StarsectorPrepatcher"]["evidence"]
+            self.assertIn("mods/StarsectorPrepatcher/mod_info.json", evidence)
+            self.assertFalse(any("javaagent entry" in item for item in evidence))
 
     def test_unknown_modified_runtime_from_core_integrity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -33,7 +33,7 @@ def run_analysis(jfr_tool: Path, recording_path: Path, mod_ownership: dict[str, 
     )
     allocation_gc = analyze_allocation_and_gc(jfr_tool, recording_path)
     startup = analyze_startup(jfr_tool, recording_path)
-    rendering = analyze_rendering(cpu_thread)
+    rendering = analyze_rendering(cpu_thread, execution_samples)
     ticks = analyze_ticks(jfr_tool, recording_path)
     tick_stall_correlation = correlate_stalls_with_execution_samples(ticks, execution_samples)
 
@@ -136,10 +136,14 @@ def render_analysis_markdown(analysis: dict[str, Any]) -> str:
         lines.append("Not available for this run (requires the optional SPW Tick Marker mod at DEEP_DIAGNOSTIC).")
     rendering = analysis.get("rendering") or {}
     lines.extend(["", "## Rendering (best-effort)", ""])
-    if rendering.get("render_thread_names_matched"):
-        lines.append(f"- Render-thread candidates: {', '.join(rendering['render_thread_names_matched'])}")
+    if rendering.get("render_thread_names"):
+        lines.append(f"- Render-thread candidates: {', '.join(rendering['render_thread_names'])}")
+        by_name = set(rendering.get("render_thread_names_matched", []))
+        by_content = set(rendering.get("render_thread_content_matched", []))
+        if by_content - by_name:
+            lines.append(f"  - Identified by sampled-stack content only (generic thread name): {', '.join(sorted(by_content - by_name))}")
     else:
-        lines.append("- No thread names matched common render-thread conventions.")
+        lines.append("- No thread matched a render-thread name pattern or had render-related sampled stack content.")
     lines.append(f"- Limitation: {rendering.get('limitations', '')}")
     lines.extend(["", "## Mod attribution", ""])
     if attribution is None:

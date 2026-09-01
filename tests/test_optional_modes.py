@@ -95,6 +95,14 @@ class BenchmarkTests(unittest.TestCase):
         self.assertGreaterEqual(result["spike_count"], 1)
 
 
+def _exec_sample(thread_name: str, class_name: str) -> dict:
+    return {
+        "type": "jdk.ExecutionSample",
+        "sampledThread": {"javaName": thread_name},
+        "stackTrace": {"frames": [{"method": {"type": {"name": class_name.replace(".", "/")}, "name": "run"}, "lineNumber": 1, "type": "JIT compiled"}]},
+    }
+
+
 class RenderingDiagnosticsTests(unittest.TestCase):
     def test_matches_lwjgl_and_render_thread_names(self) -> None:
         cpu_thread = {
@@ -105,6 +113,32 @@ class RenderingDiagnosticsTests(unittest.TestCase):
         self.assertIn("LWJGL Timer", result["render_thread_names_matched"])
         self.assertNotIn("pool-1-thread-1", result["render_thread_names_matched"])
         self.assertEqual(result["execution_samples_on_render_threads"]["LWJGL Timer"], 10)
+
+    def test_generically_named_thread_is_matched_by_render_related_stack_content(self) -> None:
+        # The real gap found in a live capture: Starsector's own hottest
+        # thread carried a JVM default name ("Thread-3") invisible to name
+        # matching, but its sampled stacks were dominated by rendering
+        # packages (here: Fast Rendering's own bridge package).
+        cpu_thread = {
+            "samples_by_thread": {"Thread-3": 4, "worker-1": 4},
+            "average_thread_cpu_fraction": {"Thread-3": 0.5, "worker-1": 0.1},
+        }
+        execution_samples = (
+            [_exec_sample("Thread-3", "com.genir.renderer.overrides.Sync")] * 3
+            + [_exec_sample("Thread-3", "java.util.HashMap")]
+            + [_exec_sample("worker-1", "com.example.somemod.Combat")] * 4
+        )
+        result = analyze_rendering(cpu_thread, execution_samples)
+        self.assertIn("Thread-3", result["render_thread_content_matched"])
+        self.assertNotIn("Thread-3", result["render_thread_names_matched"])
+        self.assertIn("Thread-3", result["render_thread_names"])
+        self.assertNotIn("worker-1", result["render_thread_names"])
+
+    def test_without_execution_samples_falls_back_to_name_matching_only(self) -> None:
+        cpu_thread = {"samples_by_thread": {"LWJGL Timer": 10}, "average_thread_cpu_fraction": {"LWJGL Timer": 0.2}}
+        result = analyze_rendering(cpu_thread, None)
+        self.assertEqual(result["render_thread_names"], ["LWJGL Timer"])
+        self.assertEqual(result["render_thread_content_matched"], [])
 
 
 if __name__ == "__main__":
