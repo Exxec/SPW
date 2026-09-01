@@ -146,16 +146,15 @@ When several material variables change, SPW must state that causal attribution i
 
 ### Configuration snapshots
 
-Each capture writes a self-contained, local snapshot directory. This makes a later comparison reproducible even after launchers or Java installations have changed:
+Each capture writes a self-contained, local snapshot to an explicit, user-selected `--output` directory. This makes a later comparison reproducible even after launchers or Java installations have changed:
 
 ```text
-profiles/<run-id>/
+<output>/
 ├─ profile.jfr
 ├─ environment.json
-├─ java.json
+├─ core-integrity.json
 ├─ runtime-capabilities.json
-├─ mods.json
-├─ core-hashes.json
+├─ mod-ownership.json
 └─ PERFORMANCE_REPORT.md
 ```
 

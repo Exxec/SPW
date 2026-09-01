@@ -38,7 +38,7 @@ What this does, in order:
 
 Finding `<pid>`: on Windows, `Get-Process java | Select-Object Id,Path` while Starsector is running, or Task Manager's Details tab.
 
-To also compare this run against a previous one, add `--compare-with .\prior-artifacts --experiment-variable enabled_mod_set_or_order` (see [Comparing two runs](#comparing-two-runs-honestly) below for why the second flag matters).
+To also compare this run against a previous one, add `--compare-with .\prior-artifacts --experiment-variable enabled_mod_set_or_order` (see [Comparing two runs](#4-comparing-two-runs-honestly) below for why the second flag matters).
 
 ## Step by step
 
@@ -137,7 +137,7 @@ Renders a single self-contained HTML file (default: `report.html` inside the art
 `spw/agent-mod` is an ordinary Starsector mod — not part of the `spw` Python package — built entirely on the public `EveryFrameScript`/`ModPlugin` modding API. It emits one `com.spw.TickBoundary` JFR event per campaign tick. It does not instrument, patch, decompile, or otherwise touch Starsector's own classes.
 
 To use it:
-1. Copy `spw/agent-mod/` into the target installation's `mods/` directory, so `mods/agent-mod/mod_info.json` exists.
+1. Copy `releases/spw-tick-marker/` (or extract `releases/spw-tick-marker.zip`) into the target installation's `mods/` directory, so `mods/spw-tick-marker/mod_info.json` exists. This is a prebuilt, runtime-only copy (`mod_info.json` + the compiled jar, no source); `spw/agent-mod/` remains the source of truth if you need to rebuild it.
 2. Enable `spw_tick_marker` from the in-game mod manager like any other mod.
 3. Run a `DEEP_DIAGNOSTIC`-level capture. `spw analyze` will report tick-indexed correlation in `tick-analysis.json`.
 
