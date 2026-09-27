@@ -70,3 +70,12 @@ To use it: copy `releases/spw-tick-marker/` (or extract `releases/spw-tick-marke
 Everything above the "Validated against a real installation" line was, at the time it was written, only exercised against a synthetic Java test harness and real `jcmd`/`jfr` tooling, not yet against a live Starsector process. Both deliberately-deferred live-Starsector validation passes have since happened (2026-09-01) — see [PERFORMANCE_WORKBENCH_PROGRESS_LOG.md](PERFORMANCE_WORKBENCH_PROGRESS_LOG.md#2026-09-01--the-live-starsector-validation-pass-for-real): the Tick Marker mod fired 9,377 real `com.spw.TickBoundary` events correctly in pass 1 and 15,882 in pass 2, and one real gap surfaced and was fixed (rendering-thread identification by name alone missed the actual dominant render thread; see the V0.9 entry above).
 
 See [PERFORMANCE_WORKBENCH_RECOMMENDATIONS.md](PERFORMANCE_WORKBENCH_RECOMMENDATIONS.md) for candidate additions to this roadmap that are not yet committed to it.
+
+## Sister repository interchange (proposed 2026-09-27)
+
+Design: [SISTER_REPO_INTERCHANGE_DESIGN.md](SISTER_REPO_INTERCHANGE_DESIGN.md).
+
+1. [ ] Freeze and export a versioned performance report for BridgeForge, with artifact hashes, metric units, attribution confidence, unavailable reasons, and SPW's comparability result. Validate with neutral synthetic fixtures before consumer integration.
+2. [ ] Export an optional versioned mod identity inventory for BridgeForge and VoidSmith, preserving duplicate IDs, disabled states, parse warnings, and install/hash provenance. Both consumers retain independent scans.
+
+**Implementation checkpoint 2026-09-27:** `spw inventory`/`diagnose` now write `mod-identity.json`; `analyze`/`diagnose` write `performance-report.json` when analysis runs. The performance metric is attributed execution *samples*, with no inferred CPU percentage or startup milestone. These producer files are versioned and covered by synthetic tests. BridgeForge ingestion and a real cross-repository round trip remain open, so the two items stay unchecked.

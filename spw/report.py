@@ -5,6 +5,7 @@ from collections import Counter
 from pathlib import Path
 
 from .models import FingerprintResult
+from .interchange import mod_identity_export, write_json
 
 
 def render_markdown(result: FingerprintResult, capture: dict[str, object] | None = None) -> str:
@@ -93,10 +94,12 @@ def write_artifacts(result: FingerprintResult, output: Path, capture: dict[str, 
         "mod_ownership": output / "mod-ownership.json",
         "runtime_capabilities": output / "runtime-capabilities.json",
         "report": output / "PERFORMANCE_REPORT.md",
+        "mod_identity": output / "mod-identity.json",
     }
     paths["environment"].write_text(json.dumps(result.environment_dict(), indent=2, sort_keys=True), encoding="utf-8")
     paths["core_integrity"].write_text(json.dumps(result.core_integrity_dict(), indent=2, sort_keys=True), encoding="utf-8")
     paths["mod_ownership"].write_text(json.dumps(result.mod_ownership_dict(), indent=2, sort_keys=True), encoding="utf-8")
     paths["runtime_capabilities"].write_text(json.dumps(result.runtime_capabilities_dict(), indent=2, sort_keys=True), encoding="utf-8")
     paths["report"].write_text(render_markdown(result, capture), encoding="utf-8")
+    write_json(paths["mod_identity"], mod_identity_export(result))
     return paths

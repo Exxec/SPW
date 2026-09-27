@@ -20,6 +20,7 @@ from .java_detector import detect_java
 from .jar_ownership import build_jar_ownership
 from .jfr_events import jfr_tool_path
 from .mod_inventory import build_inventory
+from .interchange import identity_from_ownership, performance_export, write_json
 from .models import FingerprintResult
 from .overhead import estimate_attach_overhead
 from .report import render_markdown, write_artifacts
@@ -348,6 +349,10 @@ def _run_analyze(args: argparse.Namespace) -> int:
 
     analysis = run_analysis(resolved_jfr_tool, recording_path, mod_ownership=mod_ownership)
     paths = write_analysis_artifacts(analysis, args.output)
+    write_json(args.output.expanduser().resolve() / "performance-report.json", performance_export(
+        analysis, identity_from_ownership(mod_ownership), {"profile.jfr": _hash_file(recording_path),
+                         "mod-ownership.json": _hash_file(args.mod_ownership) if args.mod_ownership else None},
+        None))
 
     print(f"Execution samples analyzed: {analysis['cpu_thread']['total_execution_samples']}")
     for label, path in paths.items():
@@ -674,12 +679,18 @@ def _run_diagnose(args: argparse.Namespace) -> int:
         "artifact_hashes": {
             "environment.json": _hash_file(inventory_paths["environment"]),
             "mod-ownership.json": _hash_file(inventory_paths["mod_ownership"]),
+            "mod-identity.json": _hash_file(inventory_paths["mod_identity"]),
             "core-integrity.json": _hash_file(inventory_paths["core_integrity"]),
             "profile.jfr": _hash_file(capture_dir / "profile.jfr") if capture_descriptor else None,
         },
     }
     output.mkdir(parents=True, exist_ok=True)
     (output / "reproducibility.json").write_text(json.dumps(reproducibility, indent=2, sort_keys=True), encoding="utf-8")
+    if analysis is not None:
+        identity = json.loads(inventory_paths["mod_identity"].read_text(encoding="utf-8"))
+        write_json(output / "performance-report.json", performance_export(
+            analysis, identity, reproducibility["artifact_hashes"],
+            capture_descriptor.get("level") if capture_descriptor else None, comparison))
 
     report_lines = [
         "# SPW diagnosis report",

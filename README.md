@@ -18,6 +18,8 @@ py -3 -m spw diagnose C:\path\to\Starsector --output .\artifacts --attach-pid <p
 
 This writes `inventory/`, `capture/`, and `analysis/` subdirectories, a top-level `DIAGNOSIS_REPORT.md`, and `reproducibility.json` (invocation, timestamp, artifact hashes). Each stage is also available on its own:
 
+`inventory` and `diagnose` also write versioned `mod-identity.json` for optional local use by sister tools. `analyze` and analyzed `diagnose` runs write `performance-report.json`; its CPU-related measure is attributed execution *samples*, never an inferred CPU percentage. Missing attribution and startup milestones remain explicit limitations.
+
 ```powershell
 # Fingerprint the installation and its mods (read-only).
 py -3 -m spw inventory C:\path\to\Starsector --output .\artifacts
