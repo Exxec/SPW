@@ -79,3 +79,18 @@ Design: [SISTER_REPO_INTERCHANGE_DESIGN.md](SISTER_REPO_INTERCHANGE_DESIGN.md).
 2. [ ] Export an optional versioned mod identity inventory for BridgeForge and VoidSmith, preserving duplicate IDs, disabled states, parse warnings, and install/hash provenance. Both consumers retain independent scans.
 
 **Implementation checkpoint 2026-09-27:** `spw inventory`/`diagnose` now write `mod-identity.json`; `analyze`/`diagnose` write `performance-report.json` when analysis runs. The performance metric is attributed execution *samples*, with no inferred CPU percentage or startup milestone. These producer files are versioned and covered by synthetic tests. BridgeForge ingestion and a real cross-repository round trip remain open, so the two items stay unchecked.
+
+## Proposed ideas (2026-10-06, owner asked for per-project ideas; proposed, not approved)
+
+1. [ ] **Accelerated-time profile.** Benchmark a campaign under a speed-up multiplier (for example the SpeedUp utility mod's key
+   held), since BridgeForge's soak runs now use it. Benefit: shows whether per-tick cost of fleet managers, economy ticks and
+   intel stays acceptable when many days pass per second, and which mods dominate.
+2. [ ] **Logged-error cost.** Count log lines and stack traces per mod and estimate their cost. A caught exception logged every
+   tick (Nexerelin's `StrategicAI` ERROR on the Avesta target) is invisible to a crash check but can slow a campaign.
+   Benefit: attributes performance loss to a mod's error spam, with evidence.
+3. [ ] **Save-growth against frame time.** Correlate BridgeForge's `save-growth` object counts per mod with SPW's captured
+   performance across a save chain. Benefit: flags leaks (ever-growing lists, intel that never cleans up) by their cost, not
+   only their size.
+4. [ ] **Per-revival performance gate.** Consume SPW evidence as one gate in BridgeForge's `release` for a revived mod, using
+   the existing versioned performance report export and its comparability result. Benefit: a revival cannot ship a large
+   regression unnoticed. This is already sister-interchange item 1; this idea is the gate itself.
