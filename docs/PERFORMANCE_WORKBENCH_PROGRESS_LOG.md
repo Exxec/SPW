@@ -146,3 +146,11 @@ Full suite green (142 tests). Pass 2 (full 155-mod set, to stress mod attributio
 **The comparability gate, tested at real stakes**: `spw compare` between pass 1 and pass 2 correctly returned `NOT_COMPARABLE`, naming all three real, simultaneous, undeclared changes between the runs -- `java_major_version` (27 to 28), `jvm_arguments`, and `enabled_mod_set_or_order` (near-vanilla to 154 mods). This is exactly the scenario the gate exists to catch: a naive tool would have compared raw CPU/allocation numbers between these two real captures and could easily have produced a false "the modpack made things slower" conclusion, when three independent variables actually changed at once.
 
 Full suite still green (142 tests, no code changes this pass -- pure validation, everything held up on the first real try). Both live-Starsector milestones from this log are now done.
+
+## 2026-10-19 — roadmap review and cache hardening
+
+Reviewed the roadmap against the current implementation. Corrected stale pre-live-validation wording and the obsolete generic-fingerprint description for Resource Cache/Prepatcher. Selected the JAR-index cache as a bounded first hardening slice: writes now use a closed sibling temporary file and atomic replacement, preserving prior bytes on replacement failure. Invalid UTF-8 and malformed entry shapes are treated as cache misses; valid neighboring entries survive. Cache writes remain best-effort, with cleanup attempted on failure. Concurrent writers can still overwrite each other's cache additions; a later scan safely rebuilds misses.
+
+Package version bumped from 0.1.0 to 0.1.1 for these backward-compatible cache reliability fixes. Cache schema remains version 1 because its serialized format is unchanged.
+
+Validation: all 148 tests passed via `py -3 -m unittest discover -s tests`; four new tests exercise encoding, entry validation, replacement failure preservation/cleanup, and complete JSON at replacement. `git diff --check` passed. This is synthetic/local evidence, with no new live Starsector run. Roadmap follow-ups explicitly retain required-report atomic writes and archive content-read bounds as open. Used one agent and preserved the existing untracked `Hermes Pipeline Contract` file.
