@@ -80,6 +80,8 @@ Design: [SISTER_REPO_INTERCHANGE_DESIGN.md](SISTER_REPO_INTERCHANGE_DESIGN.md).
 
 **Implementation checkpoint 2026-09-27:** `spw inventory`/`diagnose` now write `mod-identity.json`; `analyze`/`diagnose` write `performance-report.json` when analysis runs. The performance metric is attributed execution *samples*, with no inferred CPU percentage or startup milestone. These producer files are versioned and covered by synthetic tests. BridgeForge ingestion and a real cross-repository round trip remain open, so the two items stay unchecked.
 
+**Real-install round trip 2026-10-20 (OBSERVED, inventory only):** `spw inventory` on the real install found 160 mods (9 findings) and wrote `mod-identity.json`; VoidSmith's reviewer matched 151, 9 UNKNOWN, 0 mismatches. BridgeForge ingestion and a real `performance-report.json` (needs a capture launch) remain open. Local evidence now goes to the ignored `local-evidence/`.
+
 ## Proposed ideas (2026-10-06, owner asked for per-project ideas; proposed, not approved)
 
 1. [ ] **Accelerated-time profile.** Benchmark a campaign under a speed-up multiplier (for example the SpeedUp utility mod's key

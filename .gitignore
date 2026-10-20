@@ -7,3 +7,6 @@ dist/
 *.egg-info/
 spw-artifacts/
 *.jfr
+
+# Local real-install evidence (never committed)
+/local-evidence/
