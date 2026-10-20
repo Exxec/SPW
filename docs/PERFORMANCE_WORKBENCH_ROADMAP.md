@@ -96,6 +96,11 @@ Design: [SISTER_REPO_INTERCHANGE_DESIGN.md](SISTER_REPO_INTERCHANGE_DESIGN.md).
 4. [ ] **Per-revival performance gate.** Consume SPW evidence as one gate in BridgeForge's `release` for a revived mod, using
    the existing versioned performance report export and its comparability result. Benefit: a revival cannot ship a large
    regression unnoticed. This is already sister-interchange item 1; this idea is the gate itself.
+5. [ ] **Capture during a BridgeForge live run (2026-10-20, proposed).** A real `performance-report.json` still needs a
+   capture launch. Let `spw capture` attach to a game BridgeForge's `probe-group live` already started (or let BridgeForge
+   pass SPW's capture arguments through its launcher), so one rig launch yields the live run record and the performance
+   report for the same enabled set. Benefit: closes the open real round trip without an extra launch, and every revival
+   live run can carry a performance baseline for item 4.
 
 ## Lessons carried over from BridgeForge's hardening (item 70) and regression pass (2026-10-12; proposed, not approved)
 
