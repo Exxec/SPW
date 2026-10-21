@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "repo": "SPW",
+  "gates": [
+    {
+      "id": "spw-real-capture",
+      "title": "Real performance-report.json from a capture launch (needs a rig launch with JFR)",
+      "state": "LIVE_PENDING",
+      "evidence": [],
+      "needs": {
+        "rig": true,
+        "mods": [
+          "spw_tick_marker",
+          "bridgeforge_probe"
+        ],
+        "save": false,
+        "java": "25",
+        "launcher": "direct",
+        "lunalib": null,
+        "scenario": "spw-capture"
+      },
+      "commands": [
+        "spw capture --level DEEP_DIAGNOSTIC ...   # attach to the game started by probe-group live"
+      ],
+      "source_doc": {
+        "path": "docs/PERFORMANCE_WORKBENCH_ROADMAP.md",
+        "anchor": "BridgeForge ingestion and a real `performance-report.json`"
+      },
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "spw-bf-ingest-round-trip",
+      "title": "Real cross-repository round trip: BridgeForge ingests SPW mod-identity.json and performance-report.json",
+      "state": "LIVE_PENDING",
+      "evidence": [],
+      "needs": {
+        "rig": false,
+        "mods": [],
+        "save": false,
+        "java": null,
+        "launcher": null,
+        "lunalib": null,
+        "scenario": null
+      },
+      "commands": [
+        "spw inventory ...",
+        "python -m bridgeforge ... (ingest)"
+      ],
+      "source_doc": {
+        "path": "docs/PERFORMANCE_WORKBENCH_ROADMAP.md",
+        "anchor": "BridgeForge ingestion and a real cross-repository round trip"
+      },
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "spw-capture-during-live",
+      "title": "Capture during a BridgeForge live run: one launch yields run record and performance report (proposed 2026-10-20)",
+      "state": "NOT_TESTED",
+      "evidence": [],
+      "needs": {
+        "rig": true,
+        "mods": [
+          "spw_tick_marker",
+          "bridgeforge_probe"
+        ],
+        "save": false,
+        "java": "25",
+        "launcher": "direct",
+        "lunalib": null,
+        "scenario": "spw-capture"
+      },
+      "commands": [
+        "spw capture --pid <game pid> ..."
+      ],
+      "source_doc": {
+        "path": "docs/PERFORMANCE_WORKBENCH_ROADMAP.md",
+        "anchor": "**Capture during a BridgeForge live run"
+      },
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "spw-tick-marker-live",
+      "title": "Tick marker mod installed and tick-analysis.json reports ticks_available true on a real run",
+      "state": "NOT_TESTED",
+      "evidence": [],
+      "needs": {
+        "rig": true,
+        "mods": [
+          "spw_tick_marker"
+        ],
+        "save": false,
+        "java": "25",
+        "launcher": "direct",
+        "lunalib": null,
+        "scenario": "spw-capture"
+      },
+      "commands": [
+        "spw capture --level DEEP_DIAGNOSTIC ..."
+      ],
+      "source_doc": {
+        "path": "docs/PERFORMANCE_WORKBENCH_ROADMAP.md",
+        "anchor": "spw_tick_marker"
+      },
+      "updated": "2026-10-21"
+    }
+  ]
+}
