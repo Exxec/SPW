@@ -70,7 +70,7 @@
         "scenario": "spw-capture"
       },
       "commands": [
-        "spw capture --pid <game pid> ..."
+        "spw capture --attach-pid <game pid> ..."
       ],
       "source_doc": {
         "path": "docs/PERFORMANCE_WORKBENCH_ROADMAP.md",

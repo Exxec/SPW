@@ -1,6 +1,6 @@
 # Sister repository interchange design (2026-09-27)
 
-Status: proposed. SPW remains an independent read-only profiler. BridgeForge and VoidSmith import only explicit local artifacts; neither becomes a runtime dependency.
+Status: SPW-side producers implemented (`mod-identity.json`, `performance-report.json`; see the roadmap checkpoint of 2026-09-27); consumer ingestion and a real performance round trip remain open. SPW remains an independent read-only profiler. BridgeForge and VoidSmith import only explicit local artifacts; neither becomes a runtime dependency.
 
 ## Versioned performance export for BridgeForge
 
