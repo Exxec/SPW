@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "starsector-performance-workbench"
 version = "0.1.1"
 description = "Independent, offline runtime-profiling and benchmarking workbench for Starsector installations"
-requires-python = ">=3.10"
+requires-python = ">=3.15"
 
 [project.scripts]
 spw = "spw.cli:main"
