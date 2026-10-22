@@ -8,7 +8,7 @@ Licensed under the GNU General Public License v3.0 (or later) — see [LICENSE](
 
 ## Run
 
-Requires Python 3.10+ and a JDK with `jcmd`/`jfr` (used to control and read back Java Flight Recorder).
+Requires Python 3.15+ (`requires-python = ">=3.15"`) and a JDK with `jcmd`/`jfr` (used to control and read back Java Flight Recorder). Optionally install from the repo root with `py -3 -m pip install -e .` to get an `spw` console script; every example below also works as `py -3 -m spw ...` without installing.
 
 The fastest path is the V1.0 pipeline, which chains every stage below into one command:
 
@@ -75,6 +75,8 @@ After rebuilding, regenerate `releases/` from the updated `spw/agent-mod/` (copy
 V0.1 through V1.0 all have a first working implementation, including the `DEEP_DIAGNOSTIC` tick-boundary event and its tick-indexed sample correlation, GPU/driver fingerprinting, native crash-log ingestion, a local HTML report viewer, cached JAR indexing, and a third-party detector extension point — see [docs/PERFORMANCE_WORKBENCH_ROADMAP.md](docs/PERFORMANCE_WORKBENCH_ROADMAP.md) and [docs/PERFORMANCE_WORKBENCH_RECOMMENDATIONS.md](docs/PERFORMANCE_WORKBENCH_RECOMMENDATIONS.md) for what is genuinely evidence-backed today versus an explicitly-surfaced limitation (save-complexity fingerprinting remains intentionally scoped down; rendering-thread identification and Fast Rendering Resource Cache/Prepatcher detection were both upgraded from generic pattern-matching to real, documented-layout fingerprints after live validation, see below).
 
 **Both live-Starsector validation passes have happened.** SPW attached to and captured from a real running Starsector process, with the Tick Marker mod installed and enabled by the actual game (previously only ever exercised against a synthetic Java test harness). Pass 1 (near-vanilla, isolating first-load risk) fired 9,377 real `com.spw.TickBoundary` events correctly and caught a real gap — rendering-thread identification by name alone missed the actual dominant render thread (a JVM-default-named thread doing 86% of the real work), now fixed with a second, stack-content-based signal. Pass 2 (the real ~154-mod install, full `DEEP_DIAGNOSTIC`) pushed 15,946 execution samples with zero read failures, correctly attributed CPU samples across ~50 distinct real mods, and correctly flagged `NOT_COMPARABLE` when compared against pass 1 for three simultaneous real changes (Java 27→28, JVM arguments, and the mod set) rather than risking a false conclusion. See the progress log for full detail on both.
+
+`gates.json` (repo root, schema 1) lists the live or person-run validation gates that are not yet done, each with a `state` (`LIVE_PENDING` or `NOT_TESTED`), the rig needs, the commands, and a pointer into the roadmap. It is a status record read by people and sister tooling; SPW's code does not read it.
 
 Run the test suite with:
 

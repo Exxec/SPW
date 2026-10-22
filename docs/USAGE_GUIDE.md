@@ -4,7 +4,7 @@ A practical, task-oriented walkthrough of the `spw` CLI. For *why* it's built th
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.15+
 - A JDK whose `bin/` contains `jcmd` and `jfr` (the same JDK Starsector's `java` executable ships with, or points at, usually works). SPW shells out to these — it does not read JFR files with a bundled parser.
 - Windows is the only platform this has been exercised on so far (GPU/driver fingerprinting in particular is Windows-only via PowerShell CIM).
 
@@ -162,6 +162,10 @@ jar --create --file spw\agent-mod\jars\spw-tick-marker.jar -C build .
 - **`NOT_COMPARABLE` result you didn't expect** — read the specific material variable(s) it names in the output; something changed between runs (commonly: mod set, JVM args, or GPU driver) that you didn't declare via `--experiment-variable`.
 - **`ticks_available: false`** — the Tick Marker mod isn't installed/enabled in the captured run, or the capture wasn't `DEEP_DIAGNOSTIC`. Everything else in the analysis is still valid.
 - **Capture file looks empty/truncated right after capture ends** — this shouldn't happen (SPW polls for a stable file before returning), but if a JFR file is manually cut off mid-write, re-run the capture rather than trying to salvage a partial recording.
+
+## Pending validation gates
+
+`gates.json` in the repo root records the validation gates that still need a live Starsector run or a person (for example, a real `performance-report.json` from a capture launch). Each entry has an `id`, a `state` (`LIVE_PENDING` or `NOT_TESTED`), what the run needs, the commands, and a `source_doc` pointer into [PERFORMANCE_WORKBENCH_ROADMAP.md](PERFORMANCE_WORKBENCH_ROADMAP.md). SPW does not read the file; nothing here is a claim that a gate has passed.
 
 ## Running the test suite
 
