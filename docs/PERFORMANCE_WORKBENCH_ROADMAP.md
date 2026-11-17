@@ -128,3 +128,15 @@ The roadmap review selected local cache resilience as the first implementation s
 - [ ] **Review archive bounds at actual content-read sites.** Current JAR ownership indexing reads entry names only, without decompressing class bodies. Add bounded reads wherever archive payload ingestion is introduced; do not claim payload limits protect central-directory parsing.
 
 Validation: `py -3 -m unittest discover -s tests` passed all 148 tests, including four new cache regressions for invalid encoding, mixed valid/malformed entries, failed replacement, and complete-file replacement. One agent used; no installation, mod, or save changes.
+
+## Genome track (BridgeForge item 94, phase 94.G6; approved 2026-11-17)
+
+Source: BridgeForge `ROADMAP-3.md` item 94 and [`docs/FEATURE_GENOME_ROADMAP.md`](https://github.com/Exxec/Project-BridgeForge/blob/main/docs/FEATURE_GENOME_ROADMAP.md), where phase ids 94.G1 to 94.G7, decisions GD-1 to GD-5 and refinements GR-1 to GR-6 are defined. SPW's portion is phase 94.G6. **Status: approved by the owner 2026-11-17 ("all approved"); not yet implemented.**
+
+1. [ ] **Attribute performance to a gene (94.G6).** Map the gene manifest's classes to SPW's attribution (V0.5 above, `spw/attribution.py`) and report per-gene cost in `performance-report.json`, as versioned evidence BridgeForge reads. SPW keeps its rule of never modifying the game or mods. Acceptance: a live session with pilot P2 inserted reports the gene's cost separately from the host's. Estimate: 2-3 sessions.
+
+- **Contract.** BridgeForge's `gene.json` (schema 1), which 94.G1 defines. Nothing here starts before 94.G1 publishes it. GR-1 (approved by the owner 2026-11-17, with GR-2 to GR-6) exports it pinned by hash with shared fixtures and a conformance test in every consuming repository, as BridgeForge's `target export` does for builds; SPW adds that conformance test when this work starts.
+- **Boundary.** SPW keeps its own scope ("Product boundary" above; BridgeForge `docs/VISION.md`, "Product and repository boundaries"). It reads a gene manifest file as an optional input and returns versioned evidence through files, nothing more, as it already does with BridgeForge ("Sister repository interchange" above). SPW and BridgeForge still share no codebase and no runtime dependency.
+- **License.** GD-2 applies: third-party genes are for local, personal use; distribution only with the author's recorded permission or for the owner's own content; author credit travels with every gene.
+- **Traceability.** Commits and pull requests implementing this entry name the BridgeForge phase id in the subject (for example "... (BridgeForge 94.G6)"). Section 12 of BridgeForge's `docs/FEATURE_GENOME_ROADMAP.md` links back to this entry.
+- **Trace check.** GR-4 (approved 2026-11-17): a cross-repository check will verify that this entry cites an existing BridgeForge 94.Gn id and that BridgeForge's section 12 links back here.
