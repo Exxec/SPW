@@ -3,9 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import tempfile
 from pathlib import Path
 from typing import Any
+
+from .atomic_io import atomic_write_text
 
 CACHE_SCHEMA_VERSION = 1
 
@@ -59,23 +60,8 @@ def load_cache(cache_path: Path) -> dict[str, dict[str, Any]]:
 def save_cache(cache_path: Path, entries: dict[str, dict[str, Any]]) -> None:
     """Best-effort write; a failure here must never break a scan since the cache is purely disposable."""
 
-    temporary_path: Path | None = None
     try:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
-        # A sibling file keeps replacement on the same filesystem. Close it
-        # before replacing so this also works on Windows.
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=cache_path.parent,
-            prefix=f".{cache_path.name}.", suffix=".tmp", delete=False,
-        ) as handle:
-            temporary_path = Path(handle.name)
-            json.dump({"schema_version": CACHE_SCHEMA_VERSION, "entries": entries}, handle)
-        os.replace(temporary_path, cache_path)
+        atomic_write_text(cache_path, json.dumps({"schema_version": CACHE_SCHEMA_VERSION, "entries": entries}))
     except OSError:
         pass
-    finally:
-        if temporary_path is not None:
-            try:
-                temporary_path.unlink(missing_ok=True)
-            except OSError:
-                pass

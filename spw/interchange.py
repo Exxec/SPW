@@ -7,6 +7,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from .atomic_io import atomic_write_json
+
 INVENTORY_SCHEMA = "spw-mod-inventory-1"
 PERFORMANCE_SCHEMA = "spw-performance-1"
 
@@ -89,4 +91,4 @@ def identity_from_ownership(ownership: dict[str, Any] | None) -> dict[str, Any] 
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_json(path, payload)
