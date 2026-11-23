@@ -718,7 +718,7 @@ def _run_diagnose(args: argparse.Namespace) -> int:
         report_lines.append(f"- Analysis: {analysis['cpu_thread']['total_execution_samples']} execution samples; see `analysis/ANALYSIS_REPORT.md`.")
     if comparison is not None:
         report_lines.append(f"- Comparison against `{args.compare_with}`: {comparison['result']} (changed: {', '.join(comparison['changed_variables']) or 'none'})")
-    report_lines.extend(["", f"See `inventory/PERFORMANCE_REPORT.md` for full environment detail, and `reproducibility.json` for this run's invocation and artifact hashes.", ""])
+    report_lines.extend(["", "See `inventory/PERFORMANCE_REPORT.md` for full environment detail, and `reproducibility.json` for this run's invocation and artifact hashes.", ""])
     atomic_write_text((output / "DIAGNOSIS_REPORT.md"), "\n".join(report_lines))
 
     print(f"Diagnosis complete: {len(result.mods)} mods, {len(result.findings)} findings.")

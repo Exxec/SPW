@@ -18,7 +18,6 @@ from spw.jfr_events import (
     stack_class_names,
     top_frame,
 )
-from spw.models import FingerprintResult
 from spw.runtime_capability import detect_runtime_capabilities
 
 # A trimmed, real jdk.ExecutionSample event shape, taken from an actual
