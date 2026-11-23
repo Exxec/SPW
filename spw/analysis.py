@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .allocation_gc_analysis import analyze_allocation_and_gc
+from .atomic_io import atomic_write_text
 from .attribution import attribute_execution_samples
 from .cpu_thread_analysis import analyze_cpu_and_threads
 from .jfr_events import event_read_status, read_events_with_status
@@ -178,14 +179,14 @@ def write_analysis_artifacts(analysis: dict[str, Any], output: Path) -> dict[str
         "tick_stall_correlation": output / "tick-stall-correlation.json",
         "report": output / "ANALYSIS_REPORT.md",
     }
-    paths["cpu_thread"].write_text(json.dumps(analysis["cpu_thread"], indent=2, sort_keys=True), encoding="utf-8")
-    paths["allocation_gc"].write_text(json.dumps(analysis["allocation_gc"], indent=2, sort_keys=True), encoding="utf-8")
-    paths["startup"].write_text(json.dumps(analysis["startup"], indent=2, sort_keys=True), encoding="utf-8")
-    paths["rendering"].write_text(json.dumps(analysis["rendering"], indent=2, sort_keys=True), encoding="utf-8")
-    paths["ticks"].write_text(json.dumps(analysis["ticks"], indent=2, sort_keys=True), encoding="utf-8")
-    paths["tick_stall_correlation"].write_text(json.dumps(analysis["tick_stall_correlation"], indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_text(paths["cpu_thread"], json.dumps(analysis["cpu_thread"], indent=2, sort_keys=True))
+    atomic_write_text(paths["allocation_gc"], json.dumps(analysis["allocation_gc"], indent=2, sort_keys=True))
+    atomic_write_text(paths["startup"], json.dumps(analysis["startup"], indent=2, sort_keys=True))
+    atomic_write_text(paths["rendering"], json.dumps(analysis["rendering"], indent=2, sort_keys=True))
+    atomic_write_text(paths["ticks"], json.dumps(analysis["ticks"], indent=2, sort_keys=True))
+    atomic_write_text(paths["tick_stall_correlation"], json.dumps(analysis["tick_stall_correlation"], indent=2, sort_keys=True))
     if analysis.get("attribution") is not None:
         paths["attribution"] = output / "attribution.json"
-        paths["attribution"].write_text(json.dumps(analysis["attribution"], indent=2, sort_keys=True), encoding="utf-8")
-    paths["report"].write_text(render_analysis_markdown(analysis), encoding="utf-8")
+        atomic_write_text(paths["attribution"], json.dumps(analysis["attribution"], indent=2, sort_keys=True))
+    atomic_write_text(paths["report"], render_analysis_markdown(analysis))
     return paths

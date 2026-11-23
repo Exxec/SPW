@@ -8,6 +8,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .atomic_io import atomic_write_text
 from .analysis import run_analysis, write_analysis_artifacts
 from .benchmark import load_scenario_manifest, run_benchmark
 from .capture import DEFAULT_LEVEL, run_attach_capture, run_launch_capture
@@ -266,15 +267,15 @@ def _run_capture(args: argparse.Namespace) -> int:
         print("spw: capture requires either --attach-pid, or --java plus an explicit launch command", file=sys.stderr)
         return 2
 
-    (output / "capture-descriptor.json").write_text(json.dumps(descriptor, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_text((output / "capture-descriptor.json"), json.dumps(descriptor, indent=2, sort_keys=True))
     if overhead_estimate is not None:
-        (output / "collector-overhead.json").write_text(json.dumps(overhead_estimate, indent=2, sort_keys=True), encoding="utf-8")
+        atomic_write_text((output / "collector-overhead.json"), json.dumps(overhead_estimate, indent=2, sort_keys=True))
     # Findings raised during capture (e.g. jcmd-unavailable, jfr-start-failed,
     # tooling-jdk-target-jvm-version-mismatch) have nowhere else to land in
     # the standalone `capture` subcommand -- there is no inventory stage
     # here to fold them into environment.json, unlike `diagnose`. Without
     # this they are silently discarded.
-    (output / "findings.json").write_text(json.dumps(result.findings_dict(), indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_text((output / "findings.json"), json.dumps(result.findings_dict(), indent=2, sort_keys=True))
 
     report_path = output / "CAPTURE_REPORT.md"
     lines = [
@@ -311,7 +312,7 @@ def _run_capture(args: argparse.Namespace) -> int:
         if finding.evidence:
             lines.append(f"- Evidence: {', '.join(finding.evidence)}")
         lines.append("")
-    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(report_path, "\n".join(lines) + "\n")
 
     print(f"Capture type: {descriptor['capture_type']} (level: {descriptor.get('level')})")
     if tooling_jdk is not None:
@@ -373,7 +374,7 @@ def _run_compare(args: argparse.Namespace) -> int:
     output = args.output.expanduser().resolve()
     output.mkdir(parents=True, exist_ok=True)
     comparison_path = output / "comparison.json"
-    comparison_path.write_text(json.dumps(comparison, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_text(comparison_path, json.dumps(comparison, indent=2, sort_keys=True))
 
     report_path = output / "COMPARISON_REPORT.md"
     lines = [
@@ -390,7 +391,7 @@ def _run_compare(args: argparse.Namespace) -> int:
         lines.append("- Proposed controlled-run matrix:")
         for combination in comparison["proposed_controlled_run_matrix"]:
             lines.append(f"  - {combination}")
-    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(report_path, "\n".join(lines) + "\n")
 
     print(f"Comparability result: {comparison['result']}")
     print(f"Comparison: {comparison_path}")
@@ -422,7 +423,7 @@ def _run_benchmark(args: argparse.Namespace) -> int:
     benchmark_run = run_benchmark(result, manifest, output, frame_time_samples_seconds=frame_time_samples)
 
     run_path = output / "benchmark-run.json"
-    run_path.write_text(json.dumps(benchmark_run, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_text(run_path, json.dumps(benchmark_run, indent=2, sort_keys=True))
 
     report_path = output / "BENCHMARK_REPORT.md"
     lines = [
@@ -439,7 +440,7 @@ def _run_benchmark(args: argparse.Namespace) -> int:
         lines.append(f"- Frame time: mean {percentiles['mean_seconds']:.4f}s, p95 {percentiles['p95_seconds']:.4f}s, p99 {percentiles['p99_seconds']:.4f}s, spikes {percentiles['spike_count']}")
     else:
         lines.append("- Frame-time percentiles unavailable: no frame-time samples were supplied.")
-    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(report_path, "\n".join(lines) + "\n")
 
     print(f"Benchmark scenario: {benchmark_run['scenario_name']}")
     print(f"Run: {run_path}")
@@ -464,7 +465,7 @@ def _run_record_scenario(args: argparse.Namespace) -> int:
 
     output = args.output.expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_text(output, json.dumps(manifest, indent=2, sort_keys=True))
 
     print(f"Scenario: {output}")
     print(f"Limitation: {manifest['limitations']}")
@@ -480,7 +481,7 @@ def _run_view(args: argparse.Namespace) -> int:
     output_path = args.output.expanduser().resolve() if args.output is not None else artifacts_directory / "report.html"
     html_text = render_html_report(artifacts_directory)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(html_text, encoding="utf-8")
+    atomic_write_text(output_path, html_text)
 
     print(f"Report: {output_path}")
     return 0
@@ -498,7 +499,7 @@ def _run_crash_logs(args: argparse.Namespace) -> int:
     output = args.output.expanduser().resolve()
     output.mkdir(parents=True, exist_ok=True)
     crash_logs_path = output / "crash-logs.json"
-    crash_logs_path.write_text(json.dumps(parsed, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_text(crash_logs_path, json.dumps(parsed, indent=2, sort_keys=True))
 
     report_lines = [
         "# SPW crash log report",
@@ -538,7 +539,7 @@ def _run_crash_logs(args: argparse.Namespace) -> int:
         ]
     )
     report_path = output / "CRASH_LOG_REPORT.md"
-    report_path.write_text("\n".join(report_lines), encoding="utf-8")
+    atomic_write_text(report_path, "\n".join(report_lines))
 
     print(f"Crash logs found: {len(parsed)}")
     print(f"Parsed: {crash_logs_path}")
@@ -616,9 +617,9 @@ def _run_diagnose(args: argparse.Namespace) -> int:
         output_file = capture_dir / "profile.jfr"
         if args.estimate_overhead:
             overhead_estimate = estimate_attach_overhead(result, pid=args.attach_pid, level=args.level, output_dir=capture_dir, jcmd_path=args.jcmd, java_executable=args.java)
-            (capture_dir / "collector-overhead.json").write_text(json.dumps(overhead_estimate, indent=2, sort_keys=True), encoding="utf-8")
+            atomic_write_text((capture_dir / "collector-overhead.json"), json.dumps(overhead_estimate, indent=2, sort_keys=True))
         capture_descriptor = run_attach_capture(result, pid=args.attach_pid, output_file=output_file, duration_seconds=args.duration, level=args.level, jcmd_path=args.jcmd, java_executable=args.java)
-        (capture_dir / "capture-descriptor.json").write_text(json.dumps(capture_descriptor, indent=2, sort_keys=True), encoding="utf-8")
+        atomic_write_text((capture_dir / "capture-descriptor.json"), json.dumps(capture_descriptor, indent=2, sort_keys=True))
 
         if capture_descriptor.get("target_jvm"):
             # Only known once the attach has actually happened, so the
@@ -628,12 +629,12 @@ def _run_diagnose(args: argparse.Namespace) -> int:
             # ran the profiled process, not just the tooling JDK that was
             # known at inventory time.
             result.target_jvm = capture_descriptor["target_jvm"]
-            inventory_paths["environment"].write_text(json.dumps(result.environment_dict(), indent=2, sort_keys=True), encoding="utf-8")
+            atomic_write_text(inventory_paths["environment"], json.dumps(result.environment_dict(), indent=2, sort_keys=True))
         # Re-render PERFORMANCE_REPORT.md now that the capture descriptor
         # (and, above, the target JVM) is known -- write_artifacts() was
         # called before capture, at a point when there was nothing to
         # report here yet.
-        inventory_paths["report"].write_text(render_markdown(result, capture_descriptor), encoding="utf-8")
+        atomic_write_text(inventory_paths["report"], render_markdown(result, capture_descriptor))
 
         # Best-effort: the most-recently-modified save is the one most
         # likely to be the actively-played campaign during this capture --
@@ -645,7 +646,7 @@ def _run_diagnose(args: argparse.Namespace) -> int:
             most_recent_save = max(saves, key=lambda path: (path / "descriptor.xml").stat().st_mtime)
             save_fingerprint = parse_save_descriptor(most_recent_save)
             save_fingerprint["selection_method"] = "most_recently_modified_descriptor_xml_best_effort"
-            (capture_dir / "save-fingerprint.json").write_text(json.dumps(save_fingerprint, indent=2, sort_keys=True), encoding="utf-8")
+            atomic_write_text((capture_dir / "save-fingerprint.json"), json.dumps(save_fingerprint, indent=2, sort_keys=True))
 
         if capture_descriptor.get("output_path"):
             resolved_jfr_tool = jfr_tool_path(args.java, None)
@@ -670,7 +671,7 @@ def _run_diagnose(args: argparse.Namespace) -> int:
         prior_snapshot = _load_snapshot(args.compare_with)
         comparison = compute_comparability(prior_snapshot, this_run_snapshot, declared_experiment_variable=args.experiment_variable)
         compare_dir.mkdir(parents=True, exist_ok=True)
-        (compare_dir / "comparison.json").write_text(json.dumps(comparison, indent=2, sort_keys=True), encoding="utf-8")
+        atomic_write_text((compare_dir / "comparison.json"), json.dumps(comparison, indent=2, sort_keys=True))
 
     reproducibility = {
         "schema_version": "0.1.0",
@@ -685,7 +686,7 @@ def _run_diagnose(args: argparse.Namespace) -> int:
         },
     }
     output.mkdir(parents=True, exist_ok=True)
-    (output / "reproducibility.json").write_text(json.dumps(reproducibility, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_text((output / "reproducibility.json"), json.dumps(reproducibility, indent=2, sort_keys=True))
     if analysis is not None:
         identity = json.loads(inventory_paths["mod_identity"].read_text(encoding="utf-8"))
         write_json(output / "performance-report.json", performance_export(
@@ -718,7 +719,7 @@ def _run_diagnose(args: argparse.Namespace) -> int:
     if comparison is not None:
         report_lines.append(f"- Comparison against `{args.compare_with}`: {comparison['result']} (changed: {', '.join(comparison['changed_variables']) or 'none'})")
     report_lines.extend(["", f"See `inventory/PERFORMANCE_REPORT.md` for full environment detail, and `reproducibility.json` for this run's invocation and artifact hashes.", ""])
-    (output / "DIAGNOSIS_REPORT.md").write_text("\n".join(report_lines), encoding="utf-8")
+    atomic_write_text((output / "DIAGNOSIS_REPORT.md"), "\n".join(report_lines))
 
     print(f"Diagnosis complete: {len(result.mods)} mods, {len(result.findings)} findings.")
     print(f"Report: {output / 'DIAGNOSIS_REPORT.md'}")

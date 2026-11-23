@@ -4,6 +4,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from .atomic_io import atomic_write_text
 from .models import FingerprintResult
 from .interchange import mod_identity_export, write_json
 
@@ -96,10 +97,10 @@ def write_artifacts(result: FingerprintResult, output: Path, capture: dict[str, 
         "report": output / "PERFORMANCE_REPORT.md",
         "mod_identity": output / "mod-identity.json",
     }
-    paths["environment"].write_text(json.dumps(result.environment_dict(), indent=2, sort_keys=True), encoding="utf-8")
-    paths["core_integrity"].write_text(json.dumps(result.core_integrity_dict(), indent=2, sort_keys=True), encoding="utf-8")
-    paths["mod_ownership"].write_text(json.dumps(result.mod_ownership_dict(), indent=2, sort_keys=True), encoding="utf-8")
-    paths["runtime_capabilities"].write_text(json.dumps(result.runtime_capabilities_dict(), indent=2, sort_keys=True), encoding="utf-8")
-    paths["report"].write_text(render_markdown(result, capture), encoding="utf-8")
+    atomic_write_text(paths["environment"], json.dumps(result.environment_dict(), indent=2, sort_keys=True))
+    atomic_write_text(paths["core_integrity"], json.dumps(result.core_integrity_dict(), indent=2, sort_keys=True))
+    atomic_write_text(paths["mod_ownership"], json.dumps(result.mod_ownership_dict(), indent=2, sort_keys=True))
+    atomic_write_text(paths["runtime_capabilities"], json.dumps(result.runtime_capabilities_dict(), indent=2, sort_keys=True))
+    atomic_write_text(paths["report"], render_markdown(result, capture))
     write_json(paths["mod_identity"], mod_identity_export(result))
     return paths
