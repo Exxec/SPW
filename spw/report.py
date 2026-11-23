@@ -81,8 +81,9 @@ def render_markdown(result: FingerprintResult, capture: dict[str, object] | None
 
 def write_artifacts(result: FingerprintResult, output: Path, capture: dict[str, object] | None = None) -> dict[str, Path]:
     output = output.expanduser().resolve()
+    # Resolve both sides: an unresolved installation path (a Windows 8.3 short name, a symlink) would let an output inside it slip past.
     try:
-        output.relative_to(result.installation_path)
+        output.relative_to(result.installation_path.expanduser().resolve())
     except ValueError:
         pass
     else:
