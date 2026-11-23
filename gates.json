@@ -26,7 +26,8 @@
         "path": "docs/PERFORMANCE_WORKBENCH_ROADMAP.md",
         "anchor": "BridgeForge ingestion and a real `performance-report.json`"
       },
-      "updated": "2026-10-21"
+      "updated": "2026-11-22",
+      "note": "Checked 2026-11-22: both 2026-09-01 captures are real but predate performance-report.json (producer landed 2026-09-27) and none wrote one. Still open: needs a rig capture that runs analyze."
     },
     {
       "id": "spw-bf-ingest-round-trip",
@@ -50,7 +51,8 @@
         "path": "docs/PERFORMANCE_WORKBENCH_ROADMAP.md",
         "anchor": "BridgeForge ingestion and a real cross-repository round trip"
       },
-      "updated": "2026-10-21"
+      "updated": "2026-11-22",
+      "note": "Checked 2026-11-22: only the inventory half was observed (2026-10-20, mod-identity.json from the real install). No real performance-report.json exists and no BridgeForge ingest of a real SPW file is recorded. Still open."
     },
     {
       "id": "spw-capture-during-live",
@@ -101,7 +103,8 @@
         "path": "docs/PERFORMANCE_WORKBENCH_ROADMAP.md",
         "anchor": "spw_tick_marker"
       },
-      "updated": "2026-10-21"
+      "updated": "2026-11-22",
+      "note": "Reconciled on paper 2026-11-22 (no run): the title's acceptance was met on the owner's real install on 2026-09-01 (ticks_available true, 9,377 and 15,882 real TickBoundary events; progress log section 'the live-Starsector validation pass, for real'). Not PASS here because needs asks for a Java 25, direct-launcher rig run, those passes used Java 27 and 28, and no capture file or run id is in the repository to cite as evidence. A Java 25 rig re-run is still wanted; it can share the launch with spw-real-capture."
     }
   ]
 }

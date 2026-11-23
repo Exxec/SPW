@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from spw.lenient_json import loads
@@ -84,7 +85,7 @@ class LenientJsonTests(unittest.TestCase):
         self.assertEqual(result["dependencies"], [{"id": "lazylib", "name": "LazyLib"}])
 
     def test_invalid_json_still_raises(self) -> None:
-        with self.assertRaises(Exception):
+        with self.assertRaises(json.JSONDecodeError):
             loads("{not json at all")
 
 

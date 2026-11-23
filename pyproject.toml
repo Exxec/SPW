@@ -16,3 +16,16 @@ include = ["spw*"]
 
 [tool.setuptools.package-data]
 spw = ["jfc/*.jfc"]
+
+[tool.ruff]
+target-version = "py315"
+# One ruff for CI and local runs: ruff refuses to run at another version. Update this pin and ci.yml's ruff-action `version` together.
+required-version = "==0.17.5"
+extend-exclude = ["releases"]
+
+[tool.ruff.lint]
+# Pyflakes (unused/undefined names), syntax errors and bugbear (real bug classes only).
+select = ["E9", "F", "B"]
+# B905 (zip without strict=): the four zip() calls pair parallel lists built together; adding strict=True would turn a length
+# mismatch into a new ValueError, which is a behaviour change, so the rule stays off rather than being "fixed" blindly.
+ignore = ["B905"]

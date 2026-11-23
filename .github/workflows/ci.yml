@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  # A pull request runs CI; a push runs it only on main (the merge), so a PR commit is not tested twice.
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      # The version here and `required-version` in pyproject.toml must agree.
+      - uses: astral-sh/ruff-action@v4.1.0
+        with:
+          version: "0.17.5"
+          args: check --output-format github
+
+  test:
+    name: ${{ matrix.os }} / Python 3.15
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.15"
+      - name: Run the unit tests
+        run: python -m unittest discover -s tests

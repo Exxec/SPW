@@ -84,23 +84,33 @@ Design: [SISTER_REPO_INTERCHANGE_DESIGN.md](SISTER_REPO_INTERCHANGE_DESIGN.md).
 
 ## Proposed ideas (2026-10-06, owner asked for per-project ideas; proposed, not approved)
 
-1. [ ] **Accelerated-time profile.** Benchmark a campaign under a speed-up multiplier (for example the SpeedUp utility mod's key
+**Owner decisions, 2026-11-22** ("For everything else I will follow your recommendations"): ideas 1, 2 and 3 (accelerated-time profile, logged-error cost, save growth against frame time) are deprioritised; they stay listed, unchecked and not scheduled. Idea 5 (capture during a BridgeForge live run) stays the proposal worth doing next. Idea 4 is unchanged.
+
+1. [ ] **Accelerated-time profile** (deprioritised 2026-11-22). Benchmark a campaign under a speed-up multiplier (for example the SpeedUp utility mod's key
    held), since BridgeForge's soak runs now use it. Benefit: shows whether per-tick cost of fleet managers, economy ticks and
    intel stays acceptable when many days pass per second, and which mods dominate.
-2. [ ] **Logged-error cost.** Count log lines and stack traces per mod and estimate their cost. A caught exception logged every
+2. [ ] **Logged-error cost** (deprioritised 2026-11-22). Count log lines and stack traces per mod and estimate their cost. A caught exception logged every
    tick (Nexerelin's `StrategicAI` ERROR on the Avesta target) is invisible to a crash check but can slow a campaign.
    Benefit: attributes performance loss to a mod's error spam, with evidence.
-3. [ ] **Save-growth against frame time.** Correlate BridgeForge's `save-growth` object counts per mod with SPW's captured
+3. [ ] **Save-growth against frame time** (deprioritised 2026-11-22). Correlate BridgeForge's `save-growth` object counts per mod with SPW's captured
    performance across a save chain. Benefit: flags leaks (ever-growing lists, intel that never cleans up) by their cost, not
    only their size.
 4. [ ] **Per-revival performance gate.** Consume SPW evidence as one gate in BridgeForge's `release` for a revived mod, using
    the existing versioned performance report export and its comparability result. Benefit: a revival cannot ship a large
    regression unnoticed. This is already sister-interchange item 1; this idea is the gate itself.
-5. [ ] **Capture during a BridgeForge live run (2026-10-20, proposed).** A real `performance-report.json` still needs a
+5. [ ] **Capture during a BridgeForge live run (2026-10-20, proposed; the next one worth doing, owner 2026-11-22).** A real `performance-report.json` still needs a
    capture launch. Let `spw capture` attach to a game BridgeForge's `probe-group live` already started (or let BridgeForge
    pass SPW's capture arguments through its launcher), so one rig launch yields the live run record and the performance
    report for the same enabled set. Benefit: closes the open real round trip without an extra launch, and every revival
    live run can carry a performance baseline for item 4.
+
+## Gate reconciliation — 2026-11-22 (paper check, no run)
+
+Checked `gates.json` against the roadmap, README and progress log. No gate state changed; each gate's `note` records the result. Nothing below is new evidence.
+
+- `spw-tick-marker-live` (NOT_TESTED). Acceptance: "Tick marker mod installed and tick-analysis.json reports ticks_available true on a real run". The 2026-09-01 passes meet that wording: [progress log, "2026-09-01 — the live-Starsector validation pass, for real"](PERFORMANCE_WORKBENCH_PROGRESS_LOG.md#2026-09-01--the-live-starsector-validation-pass-for-real) records `ticks_available: true` with 9,377 real `com.spw.TickBoundary` events (pass 1) and 15,882 (pass 2) on the owner's real install, the mod enabled by the game. They do not meet the gate's `needs` (Java 25, direct launcher, the `spw-capture` scenario on the BridgeForge rig): the log names Java 27 and 28 targets, and the capture files (`*.jfr`, `local-evidence/`) are not in the repository, so there is no run id or path to cite as PASS evidence. The gate stays NOT_TESTED until a Java 25 rig capture; the same launch could also serve `spw-real-capture`.
+- `spw-real-capture` (LIVE_PENDING). Acceptance: a real `performance-report.json` from a capture launch. Both 2026-09-01 captures are real, but they predate the file (the producer landed 2026-09-27) and none wrote it; the 2026-10-20 real-install run was inventory only. Still open.
+- `spw-bf-ingest-round-trip` (LIVE_PENDING). Acceptance: BridgeForge ingests SPW's real `mod-identity.json` and `performance-report.json`. Only the identity half was observed (2026-10-20: 160 mods, 151 matched by VoidSmith's reviewer, 9 UNKNOWN, 0 mismatches); the performance report was never produced, and no BridgeForge ingest of a real SPW file is recorded. Still open.
 
 ## Lessons carried over from BridgeForge's hardening (item 70) and regression pass (2026-10-12; proposed, not approved)
 
@@ -125,7 +135,7 @@ The roadmap review selected local cache resilience as the first implementation s
 - [x] **Atomic JAR-index cache writes.** Serialize to a unique sibling temporary file, close it, then replace the destination with `os.replace`. A failed replacement preserves the previous cache and attempts temporary-file cleanup. Cache I/O remains best-effort. This prevents partial-file visibility; it does not promise power-loss durability or merge simultaneous writers.
 - [x] **Validate disposable cache entries.** Invalid UTF-8 and malformed JSON become misses. Entries must contain lists of strings for both class names and package prefixes; malformed entries are discarded individually so valid peers remain reusable.
 - [x] **Extend atomic output to report artifacts.** Centralize sibling-file replacement for CLI, inventory, analysis, and interchange outputs. Test failed writes preserve previous artifacts and propagate failures for required reports. Keep this separate from best-effort cache behavior. Done 2026-11-22 (approved by the owner 2026-11-22 by ruling: "1 and 2, consult advisor then follow recommendation"). Built `spw/atomic_io.py` with `atomic_write_text` (unique sibling temp file, flush, fsync, close, `os.replace`, temp cleanup, error re-raised) and `atomic_write_json`; the JAR-index cache now calls it and still swallows `OSError`, so cache behaviour is unchanged while required reports propagate failures. Write sites covered: all 20 `write_text` sites in `spw/cli.py` (capture-descriptor, collector-overhead, findings, comparison, benchmark run, scenario manifest, HTML viewer, crash logs, DIAGNOSIS_REPORT and the markdown reports, save-fingerprint, reproducibility), all 8 in `spw/analysis.py` (`write_analysis_artifacts`), all 5 in `spw/report.py` (`write_artifacts`), `interchange.write_json` (`mod-identity.json`, `performance-report.json`) and the cache. Tests (`tests/test_atomic_io.py`): `test_success_replaces_file_whole_and_leaves_no_temporary`, `test_json_helper_matches_standard_layout`, `test_failed_replace_preserves_previous_artifact_and_propagates`, `test_failed_write_preserves_previous_artifact_and_cleans_temporary`, `test_interchange_write_json_failure_propagates_and_keeps_old_file`, `test_analysis_artifact_failure_propagates`, `test_cache_stays_best_effort_when_helper_fails`, and the ratchet `test_package_has_no_bare_text_writes` (fails on any `write_text`/`write_bytes`/open-for-write in the package outside `atomic_io.py`). Full suite: 156 tests pass. Like the cache, this prevents partial-file visibility only; it does not promise power-loss durability for the directory entry or merge simultaneous writers.
-- [ ] **Review archive bounds at actual content-read sites.** Current JAR ownership indexing reads entry names only, without decompressing class bodies. Add bounded reads wherever archive payload ingestion is introduced; do not claim payload limits protect central-directory parsing.
+- [x] **Review archive bounds at actual content-read sites.** Current JAR ownership indexing reads entry names only, without decompressing class bodies. Add bounded reads wherever archive payload ingestion is introduced; do not claim payload limits protect central-directory parsing. Closed 2026-11-22 as not applicable (approved by the owner 2026-11-22: "For everything else I will follow your recommendations"): by this item's own note there is no content-read site, because `spw/jar_ownership.py` calls `ZipFile.namelist()` only and never reads a payload, so there is nothing to bound. A guard keeps it that way: `tests/test_archive_read_guard.py::ArchiveReadGuardTests::test_no_module_reads_a_zip_entry_without_a_bound` parses every module in `spw/` and fails on any new `ZipFile.read(...)` or `.open(...).read()` without a size (its detector is covered by `test_the_detector_finds_each_unbounded_form_and_passes_the_bounded_ones`, adapted from BridgeForge's `BoundedZipReadTests`). A future payload read must be bounded or chunked to pass. A bound would not protect central-directory parsing.
 
 Validation: `py -3 -m unittest discover -s tests` passed all 148 tests, including four new cache regressions for invalid encoding, mixed valid/malformed entries, failed replacement, and complete-file replacement. One agent used; no installation, mod, or save changes.
 

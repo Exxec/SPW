@@ -165,7 +165,7 @@ jar --create --file spw\agent-mod\jars\spw-tick-marker.jar -C build .
 
 ## Pending validation gates
 
-`gates.json` in the repo root records the validation gates that still need a live Starsector run or a person (for example, a real `performance-report.json` from a capture launch). Each entry has an `id`, a `state` (`LIVE_PENDING` or `NOT_TESTED`), what the run needs, the commands, and a `source_doc` pointer into [PERFORMANCE_WORKBENCH_ROADMAP.md](PERFORMANCE_WORKBENCH_ROADMAP.md). SPW does not read the file; nothing here is a claim that a gate has passed.
+`gates.json` in the repo root records the validation gates that still need a live Starsector run or a person (for example, a real `performance-report.json` from a capture launch). Each entry has an `id`, a `state` (`LIVE_PENDING` or `NOT_TESTED`), what the run needs, the commands, an optional dated `note` reconciling it with the evidence, and a `source_doc` pointer into [PERFORMANCE_WORKBENCH_ROADMAP.md](PERFORMANCE_WORKBENCH_ROADMAP.md). SPW does not read the file; nothing here is a claim that a gate has passed.
 
 ## Running the test suite
 
